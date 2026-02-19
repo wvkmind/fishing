@@ -116,32 +116,46 @@ public static class FishSetupEditor
             return null;
         }
 
-        // Check if prefab already exists
+        // Always recreate prefab to ensure pivot offset is applied
         var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (existing != null)
-        {
-            // Ensure NetworkIdentity exists on existing prefab
-            bool dirty = false;
-            var inst = (GameObject)PrefabUtility.InstantiatePrefab(existing);
-            if (inst.GetComponent<NetworkIdentity>() == null)
-            {
-                inst.AddComponent<NetworkIdentity>();
-                dirty = true;
-            }
-            if (dirty)
-            {
-                PrefabUtility.SaveAsPrefabAsset(inst, prefabPath);
-                Debug.Log($"[FishSetup] Added NetworkIdentity to existing prefab: {prefabPath}");
-            }
-            Object.DestroyImmediate(inst);
-
-            return AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-        }
+            AssetDatabase.DeleteAsset(prefabPath);
 
         var newInst = (GameObject)PrefabUtility.InstantiatePrefab(fbx);
         PrefabUtility.UnpackPrefabInstance(newInst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
 
-        // Add Rigidbody (for loot throw physics + ground drop)
+        // ── Offset mesh so fish head (X+ max) is at origin ──
+        // Wrap all children under a pivot parent so we can shift the mesh
+        var pivot = new GameObject("MeshPivot");
+        pivot.transform.SetParent(newInst.transform, false);
+
+        // Reparent all original children under pivot
+        var children = new System.Collections.Generic.List<Transform>();
+        foreach (Transform child in newInst.transform)
+        {
+            if (child != pivot.transform)
+                children.Add(child);
+        }
+        foreach (var child in children)
+            child.SetParent(pivot.transform, true);
+
+        // Calculate combined bounds of all renderers
+        var renderers = newInst.GetComponentsInChildren<Renderer>();
+        if (renderers.Length > 0)
+        {
+            Bounds bounds = renderers[0].bounds;
+            for (int r = 1; r < renderers.Length; r++)
+                bounds.Encapsulate(renderers[r].bounds);
+
+            // Fish head = X+ max. Shift so X+ max is at world origin (newInst.transform.position)
+            // pivot offset = -(bounds.max.x) along local X
+            Vector3 offset = new Vector3(-bounds.max.x, -bounds.center.y, -bounds.center.z);
+            pivot.transform.localPosition = offset;
+
+            Debug.Log($"[FishSetup] Pivot offset for {fbxPath}: bounds.max.x={bounds.max.x:F3} offset={offset}");
+        }
+
+        // Add Rigidbody
         if (!newInst.GetComponent<Rigidbody>())
         {
             var rb = newInst.AddComponent<Rigidbody>();
@@ -150,15 +164,11 @@ public static class FishSetupEditor
 
         // Add collider if none exists
         if (!newInst.GetComponent<Collider>())
-        {
             newInst.AddComponent<BoxCollider>();
-        }
 
-        // Add NetworkIdentity for NetworkServer.Spawn (ground drop)
+        // Add NetworkIdentity for NetworkServer.Spawn
         if (!newInst.GetComponent<NetworkIdentity>())
-        {
             newInst.AddComponent<NetworkIdentity>();
-        }
 
         var prefab = PrefabUtility.SaveAsPrefabAsset(newInst, prefabPath);
         Object.DestroyImmediate(newInst);

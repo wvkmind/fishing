@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MultiplayerFishing.FishDatabase
   entries:
   - lootName: Bigeye Tuna
-    networkPrefab: {fileID: 609110445176053794, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}
+    networkPrefab: {fileID: 3960964683026253002, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}
   - lootName: Yellow Croaker
-    networkPrefab: {fileID: 4559165197336281467, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}
+    networkPrefab: {fileID: 219219724210523925, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}

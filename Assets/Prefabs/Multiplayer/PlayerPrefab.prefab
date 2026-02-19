@@ -1748,6 +1748,7 @@ GameObject:
   - component: {fileID: 9036412120091747655}
   - component: {fileID: 7685140432723909663}
   - component: {fileID: 8742829054204468792}
+  - component: {fileID: 4930037396028668377}
   m_Layer: 6
   m_Name: PlayerPrefab
   m_TagString: Player
@@ -1994,7 +1995,6 @@ MonoBehaviour:
   _fishingSystem: {fileID: 8174459846405231255}
   _networkFloatPrefab: {fileID: 2639365602873067901, guid: d3bd5a976cc9acc4889e9b1b68bc8a0a, type: 3}
   _fishDatabase: {fileID: 11400000, guid: bb53429d2beb0234ab0e1fe4b8ca5f93, type: 2}
-  _pickupRange: 3
   syncState: 0
   syncAttractInput: 0
   syncLineLoad: 0
@@ -2065,6 +2065,24 @@ MonoBehaviour:
   _rotationWeight: 0.5
   _leftHandRatio: 0.25
   _rightHandRatio: -0.25
+--- !u!114 &4930037396028668377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3638915616474005004}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41527273b8a421940a846e4d9ae7e12f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MultiplayerFishing.IKTest
+  fishPrefab: {fileID: 219219724210523925, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}
+  scaleMul: 0.25
+  downOffset: 0.05
+  rightOffset: 0.15
+  upOffset: 0.1
+  forwardOffset: 0.35
 --- !u!1 &3793600438790473493
 GameObject:
   m_ObjectHideFlags: 0

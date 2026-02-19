@@ -24,9 +24,6 @@ namespace MultiplayerFishing
         [Header("Fish Display")]
         [SerializeField] private FishDatabase _fishDatabase;
 
-        [Header("Pickup")]
-        [SerializeField] private float _pickupRange = 3f;
-
         // ── SyncVars ──
         [SyncVar] public FishingState syncState;
         [SyncVar] public bool syncAttractInput;
@@ -396,18 +393,13 @@ namespace MultiplayerFishing
             Debug.Log($"[NFC][Server] CmdPickupFish netId={netId}");
             if (_stateMachine == null || _stateMachine.State != FishingState.Displaying) return;
 
-            // Check range
             if (_serverDroppedFish != null)
             {
-                float dist = Vector3.Distance(transform.position, _serverDroppedFish.transform.position);
-                if (dist > _pickupRange)
-                {
-                    Debug.Log($"[NFC][Server] Fish too far to pick up: {dist:F2} > {_pickupRange} netId={netId}");
-                    return;
-                }
                 NetworkServer.Destroy(_serverDroppedFish);
                 _serverDroppedFish = null;
             }
+
+            RpcCleanupFishHold();
 
             // Return to idle
             syncState = FishingState.Idle;
@@ -418,6 +410,18 @@ namespace MultiplayerFishing
             _presenter?.ClearLootData();
 
             Debug.Log($"[NFC][Server] Fish picked up, back to Idle netId={netId}");
+        }
+
+        [ClientRpc]
+        private void RpcCleanupFishHold()
+        {
+            if (Application.isBatchMode) return;
+            var hold = gameObject.GetComponent<DisplayFishHold>();
+            if (hold != null)
+            {
+                hold.Cleanup();
+                Destroy(hold);
+            }
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -466,10 +470,10 @@ namespace MultiplayerFishing
             Debug.Log($"[NFC][Server] LootGrabbed: syncLootName={syncLootName} fishDb={_fishDatabase != null} playerPos={transform.position} netId={netId}");
             if (lootObj != null)
                 Destroy(lootObj, 0.1f);
-            ServerSpawnFishAtFeet();
+            ServerSpawnHeldFish();
         }
 
-        private void ServerSpawnFishAtFeet()
+        private void ServerSpawnHeldFish()
         {
             if (_fishDatabase == null) return;
 
@@ -481,39 +485,42 @@ namespace MultiplayerFishing
                 return;
             }
 
-            // Spawn behind the player (on land side, not toward water)
-            Vector3 spawnPos = transform.position - transform.forward * 1.5f;
-            spawnPos.y = transform.position.y; // keep at player's ground level
-            Debug.Log($"[NFC][Server] SpawnFish playerPos={transform.position} fwd={transform.forward} spawnPos={spawnPos} netId={netId}");
-            _serverDroppedFish = Instantiate(prefab, spawnPos, Quaternion.identity);
+            // Spawn at player position (will be re-parented to hand on clients)
+            _serverDroppedFish = Instantiate(prefab, transform.position, Quaternion.identity);
 
-            // Remove Rigidbody — fish sits on ground as a static object, no physics
+            // Remove physics — fish is held, not dropped
             var rb = _serverDroppedFish.GetComponent<Rigidbody>();
             if (rb != null) Object.Destroy(rb);
-
-            // Ensure collider so it rests on terrain
-            if (_serverDroppedFish.GetComponent<Collider>() == null)
-                _serverDroppedFish.AddComponent<BoxCollider>();
+            var col = _serverDroppedFish.GetComponent<Collider>();
+            if (col != null) Object.Destroy(col);
 
             NetworkServer.Spawn(_serverDroppedFish);
-            RpcAddPickupLabel(_serverDroppedFish.GetComponent<NetworkIdentity>());
+            RpcAttachFishToHand(_serverDroppedFish.GetComponent<NetworkIdentity>());
 
-            // Enter Displaying state (waiting for E pickup)
+            // Enter Displaying state
             syncState = FishingState.Displaying;
             _stateMachine?.SetDisplaying();
 
-            Debug.Log($"[NFC][Server] Fish '{lootName}' launched from {spawnPos} netId={netId}");
+            Debug.Log($"[NFC][Server] Fish '{lootName}' held by player netId={netId}");
         }
 
         [ClientRpc]
-        private void RpcAddPickupLabel(NetworkIdentity fishIdentity)
+        private void RpcAttachFishToHand(NetworkIdentity fishIdentity)
         {
             if (Application.isBatchMode) return;
-            Debug.Log($"[NFC][Client] RpcAddPickupLabel fishNull={fishIdentity == null} netId={netId}");
+            Debug.Log($"[NFC][Client] RpcAttachFishToHand fishNull={fishIdentity == null} netId={netId}");
             if (fishIdentity == null) return;
-            var go = fishIdentity.gameObject;
-            if (go.GetComponent<FishPickupLabel>() == null)
-                go.AddComponent<FishPickupLabel>();
+
+            // Disable NetworkTransform on fish so LateUpdate can control position
+            var nt = fishIdentity.GetComponent<Mirror.NetworkTransformUnreliable>();
+            if (nt != null) nt.enabled = false;
+            var ntBase = fishIdentity.GetComponent<Mirror.NetworkTransformBase>();
+            if (ntBase != null) ntBase.enabled = false;
+
+            var hold = gameObject.GetComponent<DisplayFishHold>();
+            if (hold == null)
+                hold = gameObject.AddComponent<DisplayFishHold>();
+            hold.Setup(fishIdentity.gameObject);
         }
 
         private void OnServerLineBroken()
