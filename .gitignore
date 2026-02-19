@@ -38,3 +38,25 @@ crashlytics-build.properties
 
 # Kiro
 .kiro/
+
+# Third-party assets (managed separately, not version controlled)
+Assets/FishingGameTool/
+Assets/FishingGameTool.meta
+Assets/Mirror/
+Assets/Mirror.meta
+
+# Unity auto-generated
+Assets/InputSystem_Actions.inputactions
+Assets/InputSystem_Actions.inputactions.meta
+Assets/Readme.asset
+Assets/Readme.asset.meta
+Assets/ScriptTemplates/
+Assets/ScriptTemplates.meta
+Assets/Settings/
+Assets/Settings.meta
+Assets/TutorialInfo/
+Assets/TutorialInfo.meta
+Assets/Prefabs.meta
+Assets/Scenes.meta
+Assets/Scripts.meta
+Packages/
