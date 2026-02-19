@@ -14,6 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MultiplayerFishing.FishDatabase
   entries:
   - lootName: Bigeye Tuna
-    networkPrefab: {fileID: 3960964683026253002, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}
+    networkPrefab: {fileID: 1700888953988839139, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}
   - lootName: Yellow Croaker
-    networkPrefab: {fileID: 219219724210523925, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}
+    networkPrefab: {fileID: 8225046514779856276, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}
+  - lootName: Moorish Idol
+    networkPrefab: {fileID: 3226115220487718254, guid: a71461d670888684786680ac120ef6cf, type: 3}
+  - lootName: Brown Rabbitfish
+    networkPrefab: {fileID: 3763472037498434801, guid: b81f945d8f99c5c4b8e8c500053fc1e7, type: 3}
+  - lootName: Thickhead Scorpionfish
+    networkPrefab: {fileID: 5259741973666547615, guid: 7281250370371de419b52d1b39971aae, type: 3}
+  - lootName: Emperor Snapper
+    networkPrefab: {fileID: 2452997160187388870, guid: 28567b186774ed74e939ee28dfe7e6b8, type: 3}
+  - lootName: Chub Mackerel
+    networkPrefab: {fileID: 8426843030751031020, guid: da637a59ee3f34f48a683b16fc84c7a2, type: 3}

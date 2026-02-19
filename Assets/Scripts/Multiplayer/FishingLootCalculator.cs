@@ -83,8 +83,9 @@ namespace MultiplayerFishing
             foreach (var loot in lootDataList)
                 rarityPercents.Add((loot._lootRarity / totalRarity) * 100f);
 
-            int baitTier = baitData != null ? (int)baitData._baitTier + 1 : 0;
-
+            // TODO: 鱼饵系统未实现，当前忽略baitTier过滤，所有鱼按rarity均等随机。
+            // 实现鱼饵后恢复：baitTier >= (int)lootDataList[i]._lootTier 的检查。
+            // 见 DESIGN.md 第十节。
             float chanceVal = Random.Range(1f, 100f);
             float accumulated = 0f;
 
@@ -92,7 +93,7 @@ namespace MultiplayerFishing
             {
                 accumulated += rarityPercents[i];
                 if (chanceVal <= accumulated)
-                    return baitTier >= (int)lootDataList[i]._lootTier ? lootDataList[i] : null;
+                    return lootDataList[i];
             }
 
             return null;

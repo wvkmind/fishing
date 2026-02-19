@@ -39,7 +39,7 @@ public static class FishSetupEditor
             type = LootType.Fish,
             minWeight = 15f,
             maxWeight = 40f,
-            rarity = 15f,
+            rarity = 20f,
             description = "A large deep-sea tuna with big eyes"
         },
         new FishDef
@@ -50,14 +50,78 @@ public static class FishSetupEditor
             type = LootType.Fish,
             minWeight = 0.3f,
             maxWeight = 2f,
-            rarity = 40f,
+            rarity = 20f,
             description = "A common coastal fish with golden scales"
+        },
+        new FishDef
+        {
+            fbxPath = "Assets/Fishes/多棘马夫鱼/多棘马夫鱼.fbx",
+            name = "Moorish Idol",
+            tier = LootTier.Uncommon,
+            type = LootType.Fish,
+            minWeight = 0.3f,
+            maxWeight = 1.5f,
+            rarity = 20f,
+            description = "A striking reef fish with bold black and yellow stripes"
+        },
+        new FishDef
+        {
+            fbxPath = "Assets/Fishes/褐篮子鱼/褐篮子鱼.fbx",
+            name = "Brown Rabbitfish",
+            tier = LootTier.Common,
+            type = LootType.Fish,
+            minWeight = 0.2f,
+            maxWeight = 1.0f,
+            rarity = 20f,
+            description = "A herbivorous reef fish with venomous dorsal spines"
+        },
+        new FishDef
+        {
+            fbxPath = "Assets/Fishes/厚头平鮋/厚头平鮋.fbx",
+            name = "Thickhead Scorpionfish",
+            tier = LootTier.Uncommon,
+            type = LootType.Fish,
+            minWeight = 0.5f,
+            maxWeight = 3f,
+            rarity = 20f,
+            description = "A well-camouflaged bottom dweller with a large head"
+        },
+        new FishDef
+        {
+            fbxPath = "Assets/Fishes/千年笛鲷/千年笛鲷.fbx",
+            name = "Emperor Snapper",
+            tier = LootTier.Epic,
+            type = LootType.Fish,
+            minWeight = 5f,
+            maxWeight = 25f,
+            rarity = 20f,
+            description = "A prized large snapper found near coral reefs"
+        },
+        new FishDef
+        {
+            fbxPath = "Assets/Fishes/日本鲐/日本鲐.fbx",
+            name = "Chub Mackerel",
+            tier = LootTier.Common,
+            type = LootType.Fish,
+            minWeight = 0.3f,
+            maxWeight = 2.5f,
+            rarity = 20f,
+            description = "A fast-swimming pelagic fish common in coastal waters"
         }
     };
 
     [MenuItem("Tools/Fish Setup/Generate All Fish (Prefabs + LootData + Wire Water)")]
     public static void GenerateAllFish()
     {
+        // Check correct scene is open
+        var activeScene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+        if (!activeScene.name.Contains("GameScene"))
+        {
+            EditorUtility.DisplayDialog("Fish Setup",
+                "Please open GameScene first!\nCurrent scene: " + activeScene.name,
+                "OK");
+            return;
+        }
         EnsureDir(FishPrefabDir);
         EnsureDir(LootDataDir);
         EnsureDir("Assets/Config");

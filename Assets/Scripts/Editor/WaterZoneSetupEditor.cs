@@ -12,6 +12,14 @@ public static class WaterZoneSetupEditor
     [MenuItem("Tools/Water Setup/Add WaterZone Triggers")]
     public static void AddWaterZoneTriggers()
     {
+        var activeScene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+        if (!activeScene.name.Contains("GameScene"))
+        {
+            EditorUtility.DisplayDialog("Water Setup",
+                "Please open GameScene first!\nCurrent scene: " + activeScene.name,
+                "OK");
+            return;
+        }
         // Find all FishingLoot components (they live on water objects)
         var waterObjects = Object.FindObjectsByType<FishingLoot>(FindObjectsSortMode.None);
 

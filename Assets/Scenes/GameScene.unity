@@ -6733,11 +6733,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _fishingLoot:
-  - {fileID: 11400000, guid: dd19c46f920ade44892bc7fcadc5bec1, type: 2}
-  - {fileID: 11400000, guid: 2739837538c4f7b4988f2dcd83abf80f, type: 2}
-  - {fileID: 11400000, guid: c24527e0f1c1f35499fe48f4d840a89e, type: 2}
-  - {fileID: 11400000, guid: aff93508027c2104b8da9a4364555531, type: 2}
-  - {fileID: 11400000, guid: 7a736d496d94993478c515d25ef68967, type: 2}
+  - {fileID: 11400000, guid: e34fd3cafe4c9454c8ae916a043b0031, type: 2}
+  - {fileID: 11400000, guid: a6f44de5286a1b04d811257f8d035575, type: 2}
+  - {fileID: 11400000, guid: 1c3aec176efe44e48850f4a5a1609437, type: 2}
+  - {fileID: 11400000, guid: 38ff234ffb5947d4490e635dd6b314cf, type: 2}
+  - {fileID: 11400000, guid: 5312af5d82a367f43a71685a31104ba4, type: 2}
+  - {fileID: 11400000, guid: e11f78a6901851a4a98b35076821c4d3, type: 2}
+  - {fileID: 11400000, guid: 7dae53d7f26ea574c96d8e60acdfc66a, type: 2}
 --- !u!1001 &1660941559
 PrefabInstance:
   m_ObjectHideFlags: 0

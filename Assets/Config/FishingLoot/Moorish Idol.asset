@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1530bb86e5fd16742a966934f52c2c2f, type: 3}
+  m_Name: Moorish Idol
+  m_EditorClassIdentifier: Assembly-CSharp::FishingGameTool.Fishing.LootData.FishingLootData
+  _lootTier: 1
+  _lootType: 0
+  _weightRange:
+    _minWeight: 0.3
+    _maxWeight: 1.5
+  _lootRarity: 20
+  _lootName: Moorish Idol
+  _lootDescription: A striking reef fish with bold black and yellow stripes
+  _lootPrefab: {fileID: 3226115220487718254, guid: a71461d670888684786680ac120ef6cf, type: 3}

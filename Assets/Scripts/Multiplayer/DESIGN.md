@@ -338,3 +338,18 @@ v1 里服务端调用 `FishingRod.CalculateLineLoad()`，这意味着服务端�
 - FishingFloatPathfinder 依赖 Transform 和 FishingFloat 组件 — 状态机需要通过 FloatContext 传入，不能完全脱离 Unity
 - FishingRod.CalculateLineLoad 里的断线逻辑 — v2 里状态机自己算，但 FishingRod 的 OnLineBreak 回调仍然需要注册（防止 FishingRod.Update 里的 CalculateBend 触发意外行为）
 - SimpleUIManager 直接读 FishingSystem 字段 — 不改插件代码，Presenter 确保字段值正确即可
+
+
+## 十、待实现功能 (TODO)
+
+### 鱼饵系统 (Bait System)
+
+当前状态：未实现。`FishingStateMachine` 中 `_bait` 始终为 null。
+
+FishingGameTool 插件已有 `FishingBaitData` 数据结构（BaitTier: Uncommon/Rare/Epic/Legendary），`FishingLootCalculator.ChooseLoot` 原本会根据 baitTier 过滤可钓鱼种（无饵只能钓 Common 鱼）。当前已临时移除该过滤，所有鱼按 rarity 权重均等随机。
+
+实现鱼饵系统需要：
+- 背包/物品系统（存储鱼饵）
+- 装备鱼饵的 UI 和网络逻辑（`CmdSetBait` → `FishingStateMachine.SetBait()`）
+- 恢复 `ChooseLoot` 中的 baitTier 过滤逻辑
+- 不同鱼饵影响咬钩概率（`RollCatchCheck` 中已有对应逻辑）

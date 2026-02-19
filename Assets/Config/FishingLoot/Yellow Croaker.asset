@@ -17,7 +17,7 @@ MonoBehaviour:
   _weightRange:
     _minWeight: 0.3
     _maxWeight: 2
-  _lootRarity: 40
+  _lootRarity: 20
   _lootName: Yellow Croaker
   _lootDescription: A common coastal fish with golden scales
-  _lootPrefab: {fileID: 219219724210523925, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}
+  _lootPrefab: {fileID: 8225046514779856276, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}

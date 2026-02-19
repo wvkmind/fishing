@@ -120,14 +120,11 @@ namespace MultiplayerFishing
 
         // ── Loot Info ──
         private void UpdateLootInfo()
-        {
-            bool show = _controller.syncState == FishingState.Hooked
-                     && !string.IsNullOrEmpty(_controller.syncLootName);
-            _lootInfoText.gameObject.SetActive(show);
-            if (!show) return;
+                {
+                    // Hidden: don't reveal fish identity until caught — more fun
+                    _lootInfoText.gameObject.SetActive(false);
+                }
 
-            _lootInfoText.text = $"{_controller.syncLootName} | {(FishingGameTool.Fishing.LootData.LootTier)_controller.syncLootTier} | {_controller.syncLootDescription}";
-        }
 
         // ── ESC Menu ──
         private void HandleEscMenu()

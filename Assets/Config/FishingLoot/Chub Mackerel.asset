@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1530bb86e5fd16742a966934f52c2c2f, type: 3}
+  m_Name: Chub Mackerel
+  m_EditorClassIdentifier: Assembly-CSharp::FishingGameTool.Fishing.LootData.FishingLootData
+  _lootTier: 0
+  _lootType: 0
+  _weightRange:
+    _minWeight: 0.3
+    _maxWeight: 2.5
+  _lootRarity: 20
+  _lootName: Chub Mackerel
+  _lootDescription: A fast-swimming pelagic fish common in coastal waters
+  _lootPrefab: {fileID: 8426843030751031020, guid: da637a59ee3f34f48a683b16fc84c7a2, type: 3}

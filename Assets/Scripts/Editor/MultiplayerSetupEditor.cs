@@ -26,6 +26,7 @@ public static class MultiplayerSetupEditor
     [MenuItem("Tools/Multiplayer Fishing Setup/1. Create Network Float Prefab")]
     public static void CreateNetworkFloatPrefab()
     {
+        // No scene dependency — works from any scene
         var orig = AssetDatabase.LoadAssetAtPath<GameObject>(
             "Assets/FishingGameTool/Example/Prefabs/FishingFloat/FishingFloat.prefab");
         if (orig == null) { Debug.LogError("FishingFloat.prefab not found."); return; }
@@ -53,6 +54,14 @@ public static class MultiplayerSetupEditor
     [MenuItem("Tools/Multiplayer Fishing Setup/2. Create Player Prefab (DemoScene must be open)")]
     public static void CreatePlayerPrefab()
     {
+        var activeScene = EditorSceneManager.GetActiveScene();
+        if (!activeScene.name.Contains("DemoScene"))
+        {
+            EditorUtility.DisplayDialog("Multiplayer Setup",
+                "Please open DemoScene first!\nCurrent scene: " + activeScene.name,
+                "OK");
+            return;
+        }
         var charMove = Object.FindAnyObjectByType<CharacterMovement>();
         if (charMove == null) { Debug.LogError("Open DemoScene first!"); return; }
 
@@ -180,6 +189,7 @@ public static class MultiplayerSetupEditor
     [MenuItem("Tools/Multiplayer Fishing Setup/4. Fix Existing Prefabs (NetworkTransform upgrade)")]
     public static void FixExistingPrefabs()
     {
+        // No scene dependency — operates on prefab assets only
         int fixes = 0;
 
         // Fix NetworkFishingFloat prefab: Unreliable → Reliable, syncDirection = ServerToClient
@@ -298,6 +308,7 @@ public static class MultiplayerSetupEditor
     [MenuItem("Tools/Multiplayer Fishing Setup/5. Fix Lobby Scene (LobbyUI)")]
     public static void FixLobbyScene()
     {
+        // This script opens LobbyScene itself, no pre-check needed
         // Open LobbyScene
         var scene = EditorSceneManager.OpenScene(LobbyScenePath, OpenSceneMode.Single);
 
