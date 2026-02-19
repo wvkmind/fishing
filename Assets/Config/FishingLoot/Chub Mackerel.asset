@@ -20,4 +20,4 @@ MonoBehaviour:
   _lootRarity: 20
   _lootName: Chub Mackerel
   _lootDescription: A fast-swimming pelagic fish common in coastal waters
-  _lootPrefab: {fileID: 8426843030751031020, guid: da637a59ee3f34f48a683b16fc84c7a2, type: 3}
+  _lootPrefab: {fileID: 445886330007462098, guid: da637a59ee3f34f48a683b16fc84c7a2, type: 3}

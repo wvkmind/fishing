@@ -66,6 +66,10 @@ namespace MultiplayerFishing
         /// </summary>
         public static FishingLootData ChooseLoot(FishingBaitData baitData, List<FishingLootData> lootDataList)
         {
+            Debug.Log($"[ChooseLoot] Input list count={lootDataList?.Count ?? 0}");
+            for (int d = 0; d < lootDataList.Count; d++)
+                Debug.Log($"[ChooseLoot]   [{d}] {lootDataList[d]._lootName} rarity={lootDataList[d]._lootRarity} tier={lootDataList[d]._lootTier}");
+
             // Shuffle
             for (int i = 0; i < lootDataList.Count; i++)
             {

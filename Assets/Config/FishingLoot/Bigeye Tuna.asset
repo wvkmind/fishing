@@ -20,4 +20,4 @@ MonoBehaviour:
   _lootRarity: 20
   _lootName: Bigeye Tuna
   _lootDescription: A large deep-sea tuna with big eyes
-  _lootPrefab: {fileID: 1700888953988839139, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}
+  _lootPrefab: {fileID: 2685983310992776639, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}

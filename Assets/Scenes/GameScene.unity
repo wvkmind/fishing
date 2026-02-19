@@ -8927,7 +8927,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
       propertyPath: _fishingLoot.Array.size
-      value: 2
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
       propertyPath: '_fishingLoot.Array.data[0]'
@@ -8937,6 +8937,26 @@ PrefabInstance:
       propertyPath: '_fishingLoot.Array.data[1]'
       value: 
       objectReference: {fileID: 11400000, guid: a6f44de5286a1b04d811257f8d035575, type: 2}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[2]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 1c3aec176efe44e48850f4a5a1609437, type: 2}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[3]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 38ff234ffb5947d4490e635dd6b314cf, type: 2}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[4]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 5312af5d82a367f43a71685a31104ba4, type: 2}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[5]'
+      value: 
+      objectReference: {fileID: 11400000, guid: e11f78a6901851a4a98b35076821c4d3, type: 2}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[6]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 7dae53d7f26ea574c96d8e60acdfc66a, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

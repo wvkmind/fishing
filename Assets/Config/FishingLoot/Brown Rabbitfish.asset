@@ -20,4 +20,4 @@ MonoBehaviour:
   _lootRarity: 20
   _lootName: Brown Rabbitfish
   _lootDescription: A herbivorous reef fish with venomous dorsal spines
-  _lootPrefab: {fileID: 3763472037498434801, guid: b81f945d8f99c5c4b8e8c500053fc1e7, type: 3}
+  _lootPrefab: {fileID: 5281671064087001228, guid: b81f945d8f99c5c4b8e8c500053fc1e7, type: 3}

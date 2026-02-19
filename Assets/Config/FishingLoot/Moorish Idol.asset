@@ -20,4 +20,4 @@ MonoBehaviour:
   _lootRarity: 20
   _lootName: Moorish Idol
   _lootDescription: A striking reef fish with bold black and yellow stripes
-  _lootPrefab: {fileID: 3226115220487718254, guid: a71461d670888684786680ac120ef6cf, type: 3}
+  _lootPrefab: {fileID: 1284612768619343899, guid: a71461d670888684786680ac120ef6cf, type: 3}

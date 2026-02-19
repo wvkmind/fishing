@@ -20,4 +20,4 @@ MonoBehaviour:
   _lootRarity: 20
   _lootName: Emperor Snapper
   _lootDescription: A prized large snapper found near coral reefs
-  _lootPrefab: {fileID: 2452997160187388870, guid: 28567b186774ed74e939ee28dfe7e6b8, type: 3}
+  _lootPrefab: {fileID: 7245264796316920109, guid: 28567b186774ed74e939ee28dfe7e6b8, type: 3}

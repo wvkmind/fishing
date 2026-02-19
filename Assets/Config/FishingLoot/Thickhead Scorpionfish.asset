@@ -20,4 +20,4 @@ MonoBehaviour:
   _lootRarity: 20
   _lootName: Thickhead Scorpionfish
   _lootDescription: A well-camouflaged bottom dweller with a large head
-  _lootPrefab: {fileID: 5259741973666547615, guid: 7281250370371de419b52d1b39971aae, type: 3}
+  _lootPrefab: {fileID: 8891676150184605956, guid: 7281250370371de419b52d1b39971aae, type: 3}

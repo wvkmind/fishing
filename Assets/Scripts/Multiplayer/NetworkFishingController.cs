@@ -344,6 +344,7 @@ namespace MultiplayerFishing
             if (rb != null)
             {
                 rb.isKinematic = false;
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
                 rb.AddForce(direction * force, ForceMode.Impulse);
             }
 
