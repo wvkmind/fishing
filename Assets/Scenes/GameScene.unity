@@ -1720,6 +1720,72 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f611d77947a7ec74692548d60ef94887, type: 3}
+--- !u!1 &529017141
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 529017142}
+  - component: {fileID: 529017144}
+  - component: {fileID: 529017143}
+  m_Layer: 4
+  m_Name: WaterZoneTrigger
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &529017142
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 529017141}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1646389792}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &529017143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 529017141}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1cfabc9d7c7d1045a6bd04251a2d5d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MultiplayerFishing.WaterZone
+--- !u!65 &529017144
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 529017141}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 10, y: 3, z: 10}
+  m_Center: {x: 0, y: -0.5, z: 0}
 --- !u!1001 &529862446
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6650,7 +6716,8 @@ Transform:
   m_LocalPosition: {x: 144.19, y: 4.99, z: 70.15}
   m_LocalScale: {x: 2.4582305, y: 1, z: 1.2322}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 529017142}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 28.495, z: 11.538}
 --- !u!114 &1646389793
@@ -8856,6 +8923,18 @@ PrefabInstance:
       propertyPath: m_BoxOffset.z
       value: 12.207169
       objectReference: {fileID: 0}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: _fishingLoot.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[0]'
+      value: 
+      objectReference: {fileID: 11400000, guid: e34fd3cafe4c9454c8ae916a043b0031, type: 2}
+    - target: {fileID: 3779829312270530110, guid: ef28ef08cdcc26146a9841b1af1fcbda, type: 3}
+      propertyPath: '_fishingLoot.Array.data[1]'
+      value: 
+      objectReference: {fileID: 11400000, guid: a6f44de5286a1b04d811257f8d035575, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

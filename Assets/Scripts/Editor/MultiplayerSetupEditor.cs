@@ -227,6 +227,14 @@ public static class MultiplayerSetupEditor
                 changed = true;
             }
 
+            // Add DisplayFishIK if missing
+            if (inst.GetComponent<DisplayFishIK>() == null)
+            {
+                inst.AddComponent<DisplayFishIK>();
+                Debug.Log("[Fix] Player prefab: added DisplayFishIK component");
+                changed = true;
+            }
+
             // Fix NetworkAnimator (must be ClientToServer + clientAuthority for player anims)
             var netAnim = inst.GetComponent<NetworkAnimator>();
             if (netAnim != null)
@@ -252,6 +260,24 @@ public static class MultiplayerSetupEditor
                 simpleUI.enabled = false;
                 Debug.Log("[Fix] Player prefab: disabled SimpleUIManager");
                 changed = true;
+            }
+
+            // Wire FishDatabase if missing
+            var fc = inst.GetComponent<NetworkFishingController>();
+            if (fc != null)
+            {
+                var dbField = typeof(NetworkFishingController).GetField("_fishDatabase",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (dbField != null && dbField.GetValue(fc) == null)
+                {
+                    var fishDb = AssetDatabase.LoadAssetAtPath<MultiplayerFishing.FishDatabase>("Assets/Config/FishDatabase.asset");
+                    if (fishDb != null)
+                    {
+                        dbField.SetValue(fc, fishDb);
+                        Debug.Log("[Fix] Player prefab: wired FishDatabase");
+                        changed = true;
+                    }
+                }
             }
 
             if (changed)
@@ -331,9 +357,14 @@ public static class MultiplayerSetupEditor
         if (fs) typeof(NetworkFishingController).GetField("_fishingSystem", flags)?.SetValue(fc, fs);
         var nfp = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkFloatPrefabPath);
         if (nfp) typeof(NetworkFishingController).GetField("_networkFloatPrefab", flags)?.SetValue(fc, nfp);
+        var fishDb = AssetDatabase.LoadAssetAtPath<MultiplayerFishing.FishDatabase>("Assets/Config/FishDatabase.asset");
+        if (fishDb) typeof(NetworkFishingController).GetField("_fishDatabase", flags)?.SetValue(fc, fishDb);
 
         // FishingUI — replaces SimpleUIManager for multiplayer
         if (!go.GetComponent<FishingUI>()) go.AddComponent<FishingUI>();
+
+        // DisplayFishIK — IK for holding fish during Displaying state
+        if (!go.GetComponent<DisplayFishIK>()) go.AddComponent<DisplayFishIK>();
 
         // Disable SimpleUIManager if present (FishingUI replaces it)
         var simpleUI = go.GetComponentInChildren<SimpleUIManager>(true);

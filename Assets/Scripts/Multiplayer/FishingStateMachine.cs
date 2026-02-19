@@ -170,6 +170,22 @@ namespace MultiplayerFishing
             _bait = baitData;
         }
 
+        /// <summary>Enter Displaying state (fish caught, showing to players).</summary>
+        public void SetDisplaying()
+        {
+            SetState(FishingState.Displaying);
+        }
+
+        /// <summary>Dismiss display fish, return to Idle.</summary>
+        public void DismissDisplay()
+        {
+            if (_state == FishingState.Displaying)
+            {
+                ResetFishingData();
+                SetState(FishingState.Idle);
+            }
+        }
+
         // ══════════════════════════════════════════════════════════════
         //  Floating state — loot check, no-loot attract, line limit
         // ══════════════════════════════════════════════════════════════
@@ -187,7 +203,7 @@ namespace MultiplayerFishing
                 if (_catchCheckTimer <= 0f)
                 {
                     _caughtLoot = FishingLootCalculator.RollCatchCheck(
-                        _bait, null, // catchProbabilityData read from config area later
+                        _bait, null,
                         ctx.playerPosition, ctx.floatPosition);
                     _catchCheckTimer = _cfg.catchCheckInterval;
 
@@ -409,32 +425,12 @@ namespace MultiplayerFishing
         private void GrabLoot(Vector3 floatPosition, Vector3 playerPosition)
         {
             Debug.Log($"[StateMachine] GrabLoot loot={_caughtLootData?._lootName} catchType={_cfg.lootCatchType}");
-            if (_caughtLootData != null && _cfg.lootCatchType == LootCatchType.SpawnItem)
-            {
-                if (_caughtLootData._lootPrefab != null)
-                {
-                    Vector3 dir = ((playerPosition - floatPosition) + Vector3.up * 3f).normalized;
-                    Vector3 spawnPos = floatPosition + Vector3.up;
-                    float dist = Vector3.Distance(floatPosition, playerPosition);
-                    float force = dist / 0.8f;
 
-                    GameObject lootObj = UnityEngine.Object.Instantiate(
-                        _caughtLootData._lootPrefab, spawnPos, Quaternion.identity);
-
-                    var rb = lootObj.GetComponent<Rigidbody>();
-                    if (rb != null)
-                        rb.AddForce(dir * force, ForceMode.Impulse);
-
-                    OnLootGrabbed?.Invoke(lootObj);
-                }
-                else
-                {
-                    Debug.LogError("[FishingStateMachine] No loot prefab assigned!");
-                }
-            }
-
+            // Notify controller to spawn the ground-drop fish (no intermediate fly animation)
+            OnLootGrabbed?.Invoke(null);
             OnRequestDestroyFloat?.Invoke();
-            CleanupAndIdle();
+            // Don't CleanupAndIdle here — controller will enter Displaying state.
+            // State machine stays in current state; controller manages transition.
         }
 
         // ══════════════════════════════════════════════════════════════

@@ -434,7 +434,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _fishingFloatLayerMask:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 0
   _checkerRadius: 0.03
   _enableFloatAnim: 1
   _fishingFloatAnimationSettings:

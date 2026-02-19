@@ -123,6 +123,16 @@ namespace MultiplayerFishing
 #endif
         }
 
+        private void OnHostLocal()
+        {
+            var nm = NetworkManager.singleton;
+            if (nm == null) return;
+
+            nm.StartHost();
+            _statusText.text = "Starting local host...";
+            _statusText.color = new Color(0.3f, 0.9f, 0.3f);
+        }
+
         private void BuildUI()
         {
             // Ensure EventSystem exists (required for button clicks)
@@ -145,7 +155,7 @@ namespace MultiplayerFishing
             canvasGo.AddComponent<GraphicRaycaster>();
 
             // Center panel
-            var panel = CreatePanel(canvasGo.transform, new Vector2(400f, 300f));
+            var panel = CreatePanel(canvasGo.transform, new Vector2(400f, 360f));
 
             // Title
             var title = CreateText(panel.transform, "Fishing Online", 36,
@@ -159,13 +169,19 @@ namespace MultiplayerFishing
 
             // Connect button
             _connectBtn = CreateButton(panel.transform, "CONNECT",
-                new Vector2(0f, -30f), new Vector2(280f, 50f),
+                new Vector2(0f, -10f), new Vector2(280f, 50f),
                 new Color(0.2f, 0.5f, 0.8f), OnConnect, out _connectBtnText);
+
+            // Host local button
+            TMP_Text _hostText;
+            CreateButton(panel.transform, "HOST (LOCAL)",
+                new Vector2(0f, -70f), new Vector2(280f, 50f),
+                new Color(0.2f, 0.65f, 0.4f), OnHostLocal, out _hostText);
 
             // Quit button
             TMP_Text _;
             _quitBtn = CreateButton(panel.transform, "QUIT",
-                new Vector2(0f, -95f), new Vector2(280f, 50f),
+                new Vector2(0f, -130f), new Vector2(280f, 50f),
                 new Color(0.6f, 0.2f, 0.2f), OnQuit, out _);
         }
 

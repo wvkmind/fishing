@@ -11,16 +11,6 @@ namespace MultiplayerFishing
 {
     /// <summary>
     /// v2 Network controller — thin orchestrator.
-    ///
-    /// Responsibilities:
-    ///   1. Lifecycle: disable FishingSystem, create state machine + presenter
-    ///   2. Input: read Fire1/Fire2 on authority client, send Commands
-    ///   3. Networking: Commands, ClientRpcs, SyncVars
-    ///   4. Tick: drive state machine (server) + presenter (all clients)
-    ///   5. Throttled sync: lineLoad/overLoad
-    ///
-    /// Does NOT contain any fishing logic — that lives in FishingStateMachine.
-    /// Does NOT write plugin fields directly — that lives in FishingPresenter.
     /// </summary>
     [RequireComponent(typeof(NetworkIdentity))]
     public class NetworkFishingController : NetworkBehaviour
@@ -30,6 +20,12 @@ namespace MultiplayerFishing
 
         [Header("Network Float Prefab")]
         [SerializeField] private GameObject _networkFloatPrefab;
+
+        [Header("Fish Display")]
+        [SerializeField] private FishDatabase _fishDatabase;
+
+        [Header("Pickup")]
+        [SerializeField] private float _pickupRange = 3f;
 
         // ── SyncVars ──
         [SyncVar] public FishingState syncState;
@@ -47,22 +43,23 @@ namespace MultiplayerFishing
         // ── Server-only ──
         private FishingStateMachine _stateMachine;
         private GameObject _spawnedFloat;
+        private GameObject _serverDroppedFish; // fish on the ground (server-spawned NetworkObject)
 
         // Throttled sync
         private float _lastSyncedLineLoad;
         private float _lastSyncedOverLoad;
         private float _syncTimer;
-        private float _floatDiagTimer; // periodic float diagnostic logging
+        private float _floatDiagTimer;
 
         // ── All clients ──
         private FishingPresenter _presenter;
-        private FishingUI _fishingUI; // local player only
+        private FishingUI _fishingUI;
 
         // ── Authority client input ──
         private bool _isCharging;
         private float _currentCastForce;
         private bool _wasAttracting;
-        private bool _castSent; // prevents duplicate CmdCast before SyncVar updates
+        private bool _castSent;
 
         // ── Rod equip/unequip ──
         private GameObject _rodGameObject;
@@ -97,57 +94,37 @@ namespace MultiplayerFishing
             };
 
             _stateMachine = new FishingStateMachine(config);
-
-            // Wire callbacks
             _stateMachine.OnStateChanged = OnServerStateChanged;
             _stateMachine.OnRequestDestroyFloat = OnServerDestroyFloat;
             _stateMachine.OnLootSelected = OnServerLootSelected;
             _stateMachine.OnLootGrabbed = OnServerLootGrabbed;
             _stateMachine.OnLineBroken = OnServerLineBroken;
 
-            // Register line break callback on FishingRod (prevents FindObjectsByType fallback)
             _fishingSystem._fishingRod.OnLineBreak = () => _stateMachine.ForceStop();
 
-            // Disable visual-only components on dedicated server — they waste CPU
-            // and can NullRef (no camera, no renderer needed)
             if (Application.isBatchMode)
-            {
                 DisableServerVisuals();
-            }
         }
 
-        /// <summary>
-        /// Disables components that are purely visual/client-side.
-        /// Called on dedicated server only.
-        /// </summary>
         private void DisableServerVisuals()
         {
-            // FishingRod: CalculateBend + LineRenderer — pure visuals
             var rod = _fishingSystem._fishingRod;
             if (rod != null) rod.enabled = false;
 
-            // HandIK: animation IK + reads _fishingFloat.position (NullRef risk)
             var handIK = GetComponentInChildren<FishingGameTool.Example.HandIK>(true);
             if (handIK != null) handIK.enabled = false;
 
-            // TPPCamera: follows target, reads mouse input
             var tppCam = GetComponentInChildren<FishingGameTool.Example.TPPCamera>(true);
             if (tppCam != null) tppCam.enabled = false;
 
-            // NOTE: Do NOT disable Animator — NetworkAnimator needs it to relay
-            // animation parameters between clients (Walk, CaughtLoot, etc.)
-
-            // LineRenderer: no rendering on server
             var lineRenderers = GetComponentsInChildren<LineRenderer>(true);
             foreach (var lr in lineRenderers) lr.enabled = false;
 
-            // SkinnedMeshRenderer: no rendering on server
             var skinRenderers = GetComponentsInChildren<SkinnedMeshRenderer>(true);
             foreach (var sr in skinRenderers) sr.enabled = false;
 
             Debug.Log($"[NFC][Server] Disabled visual components for headless mode netId={netId}");
         }
-
 
         public override void OnStartClient()
         {
@@ -158,15 +135,13 @@ namespace MultiplayerFishing
             _fishingSystem.enabled = false;
             _presenter = new FishingPresenter(_fishingSystem);
 
-            // Cache rod references for equip/unequip
             var rod = _fishingSystem._fishingRod;
-            if (rod != null) _rodGameObject = rod.gameObject;
+            if (rod != null)
+                _rodGameObject = rod.gameObject;
             _handIK = GetComponentInChildren<FishingGameTool.Example.HandIK>(true);
 
-            // Start with rod unequipped (hidden)
             ApplyRodVisuals(syncRodEquipped);
 
-            // Initialize FishingUI for local player only
             if (isOwned)
             {
                 var fishingUI = GetComponentInChildren<FishingUI>(true);
@@ -220,7 +195,8 @@ namespace MultiplayerFishing
 
             _stateMachine.Tick(Time.deltaTime, ctx);
 
-            // Periodic float diagnostic (every 0.5s)
+            if (_spawnedFloat == null) return;
+
             _floatDiagTimer -= Time.deltaTime;
             if (_floatDiagTimer <= 0f)
             {
@@ -229,14 +205,12 @@ namespace MultiplayerFishing
                 _floatDiagTimer = 0.5f;
             }
 
-            // Provide loot list when entering Hooked (if not yet provided)
             if (_stateMachine.State == FishingState.Hooked && _stateMachine.CaughtLootData == null)
             {
                 List<FishingLootData> lootList = fishingFloat.GetLootDataFormWaterObject();
                 _stateMachine.ProvideLootList(lootList);
             }
 
-            // Throttled line load sync
             ThrottledSyncLineStatus(_stateMachine.LineLoad, _stateMachine.OverLoad);
         }
 
@@ -263,13 +237,8 @@ namespace MultiplayerFishing
 
         private void ClientPresent()
         {
-            // Visual/animation (all clients, all players)
-            _presenter.Apply(
-                syncState,
-                syncAttractInput,
-                ActiveFloatTransform);
+            _presenter.Apply(syncState, syncAttractInput, ActiveFloatTransform);
 
-            // UI (local player only)
             if (isOwned && _fishingUI != null)
                 _fishingUI.UpdateUI(_isCharging, _currentCastForce);
         }
@@ -281,18 +250,28 @@ namespace MultiplayerFishing
         private void HandleLocalInput()
         {
             if (_fishingSystem == null) return;
-
-            // Block input when ESC menu is open
             if (_fishingUI != null && _fishingUI.IsMenuOpen) return;
 
-            // ── Rod equip toggle (F key) ──
-            if (Input.GetKeyDown(KeyCode.F) && syncState == FishingState.Idle)
+            // ── Rod equip toggle (F key) — works in any state ──
+            if (Input.GetKeyDown(KeyCode.F))
             {
-                CmdToggleRod();
-                return; // consume this frame's input
+                if (syncState == FishingState.Idle || syncState == FishingState.Displaying)
+                {
+                    CmdToggleRod();
+                    return;
+                }
             }
 
-            // ── All fishing input requires rod to be equipped ──
+            // ── Pick up fish on ground (E key) ──
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                if (syncState == FishingState.Displaying)
+                {
+                    CmdPickupFish();
+                    return;
+                }
+            }
+
             if (!syncRodEquipped) return;
 
             // ── Attract (Fire2) ──
@@ -308,9 +287,7 @@ namespace MultiplayerFishing
                         && !_castSent;
 
             if (castInput && canCast)
-            {
                 _isCharging = true;
-            }
 
             if (_isCharging)
             {
@@ -321,16 +298,13 @@ namespace MultiplayerFishing
                 }
                 else
                 {
-                    // Released — send cast command
                     CmdCast(_currentCastForce, transform.forward + Vector3.up);
                     _currentCastForce = 0f;
                     _isCharging = false;
-                    _castSent = true; // block further casts until state changes
+                    _castSent = true;
                 }
             }
 
-            // Reset cast lock when server confirms state moved past Idle.
-            // Two-phase: first detect state left Idle, then allow re-cast when back to Idle.
             if (_castSent && syncState != FishingState.Idle)
                 _castSent = false;
         }
@@ -342,8 +316,9 @@ namespace MultiplayerFishing
         [Command]
         private void CmdToggleRod()
         {
-            // Can only toggle when idle (not mid-fishing)
-            if (_stateMachine != null && _stateMachine.State != FishingState.Idle) return;
+            if (_stateMachine != null
+                && _stateMachine.State != FishingState.Idle
+                && _stateMachine.State != FishingState.Displaying) return;
             syncRodEquipped = !syncRodEquipped;
             Debug.Log($"[NFC][Server] RodEquipped={syncRodEquipped} netId={netId}");
         }
@@ -354,7 +329,7 @@ namespace MultiplayerFishing
             Debug.Log($"[NFC][Server] CmdCast force={force:F2} dir={direction} netId={netId}");
             if (_stateMachine == null) return;
             float delay = _stateMachine.BeginCast();
-            if (delay < 0f) return; // not in Idle
+            if (delay < 0f) return;
             StartCoroutine(ServerCastCoroutine(force, direction, delay));
         }
 
@@ -365,12 +340,9 @@ namespace MultiplayerFishing
 
             yield return new WaitForSeconds(delay);
 
-            // Spawn float
             Vector3 spawnPoint = _fishingSystem._fishingRod._line._lineAttachment.position;
             _spawnedFloat = Instantiate(_networkFloatPrefab, spawnPoint, Quaternion.identity);
 
-            // Ensure Rigidbody is non-kinematic BEFORE applying force
-            // (OnStartServer sets this too, but it fires during NetworkServer.Spawn which is after AddForce)
             var rb = _spawnedFloat.GetComponent<Rigidbody>();
             if (rb != null)
             {
@@ -379,13 +351,10 @@ namespace MultiplayerFishing
             }
 
             NetworkServer.Spawn(_spawnedFloat);
-            Debug.Log($"[NFC][Server] Float spawned at {spawnPoint} force={force:F2} dir={direction} rb.isKinematic={rb?.isKinematic} netId={netId}");
+            Debug.Log($"[NFC][Server] Float spawned at {spawnPoint} force={force:F2} netId={netId}");
 
-            // Tell state machine float is ready
             _stateMachine.OnFloatSpawned();
             syncState = FishingState.Floating;
-
-            // Tell all clients about the float
             RpcOnFloatSpawned(_spawnedFloat.GetComponent<NetworkIdentity>());
         }
 
@@ -419,6 +388,36 @@ namespace MultiplayerFishing
             _stateMachine.FixLine();
             syncState = _stateMachine.State;
             RpcOnLineFixed();
+        }
+
+        [Command]
+        private void CmdPickupFish()
+        {
+            Debug.Log($"[NFC][Server] CmdPickupFish netId={netId}");
+            if (_stateMachine == null || _stateMachine.State != FishingState.Displaying) return;
+
+            // Check range
+            if (_serverDroppedFish != null)
+            {
+                float dist = Vector3.Distance(transform.position, _serverDroppedFish.transform.position);
+                if (dist > _pickupRange)
+                {
+                    Debug.Log($"[NFC][Server] Fish too far to pick up: {dist:F2} > {_pickupRange} netId={netId}");
+                    return;
+                }
+                NetworkServer.Destroy(_serverDroppedFish);
+                _serverDroppedFish = null;
+            }
+
+            // Return to idle
+            syncState = FishingState.Idle;
+            syncLootName = null;
+            syncLootTier = 0;
+            syncLootDescription = null;
+            _stateMachine.DismissDisplay();
+            _presenter?.ClearLootData();
+
+            Debug.Log($"[NFC][Server] Fish picked up, back to Idle netId={netId}");
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -459,16 +458,62 @@ namespace MultiplayerFishing
             syncLootName = lootData._lootName;
             syncLootTier = (int)lootData._lootTier;
             syncLootDescription = lootData._lootDescription;
-
             RpcOnLootSelected(lootData._lootName, (int)lootData._lootTier, lootData._lootDescription);
         }
 
         private void OnServerLootGrabbed(GameObject lootObj)
         {
-            Debug.Log($"[NFC][Server] LootGrabbed: {lootObj.name} netId={netId}");
-            // Loot is visual-only (fish flies out and lands). No network sync needed.
-            // Just let it exist on server, auto-destroy after 30s.
-            Destroy(lootObj, 30f);
+            Debug.Log($"[NFC][Server] LootGrabbed: syncLootName={syncLootName} fishDb={_fishDatabase != null} playerPos={transform.position} netId={netId}");
+            if (lootObj != null)
+                Destroy(lootObj, 0.1f);
+            ServerSpawnFishAtFeet();
+        }
+
+        private void ServerSpawnFishAtFeet()
+        {
+            if (_fishDatabase == null) return;
+
+            string lootName = syncLootName;
+            var prefab = _fishDatabase.GetNetworkPrefab(lootName);
+            if (prefab == null)
+            {
+                Debug.LogWarning($"[NFC][Server] No prefab for '{lootName}', skipping netId={netId}");
+                return;
+            }
+
+            // Spawn behind the player (on land side, not toward water)
+            Vector3 spawnPos = transform.position - transform.forward * 1.5f;
+            spawnPos.y = transform.position.y; // keep at player's ground level
+            Debug.Log($"[NFC][Server] SpawnFish playerPos={transform.position} fwd={transform.forward} spawnPos={spawnPos} netId={netId}");
+            _serverDroppedFish = Instantiate(prefab, spawnPos, Quaternion.identity);
+
+            // Remove Rigidbody — fish sits on ground as a static object, no physics
+            var rb = _serverDroppedFish.GetComponent<Rigidbody>();
+            if (rb != null) Object.Destroy(rb);
+
+            // Ensure collider so it rests on terrain
+            if (_serverDroppedFish.GetComponent<Collider>() == null)
+                _serverDroppedFish.AddComponent<BoxCollider>();
+
+            NetworkServer.Spawn(_serverDroppedFish);
+            RpcAddPickupLabel(_serverDroppedFish.GetComponent<NetworkIdentity>());
+
+            // Enter Displaying state (waiting for E pickup)
+            syncState = FishingState.Displaying;
+            _stateMachine?.SetDisplaying();
+
+            Debug.Log($"[NFC][Server] Fish '{lootName}' launched from {spawnPos} netId={netId}");
+        }
+
+        [ClientRpc]
+        private void RpcAddPickupLabel(NetworkIdentity fishIdentity)
+        {
+            if (Application.isBatchMode) return;
+            Debug.Log($"[NFC][Client] RpcAddPickupLabel fishNull={fishIdentity == null} netId={netId}");
+            if (fishIdentity == null) return;
+            var go = fishIdentity.gameObject;
+            if (go.GetComponent<FishPickupLabel>() == null)
+                go.AddComponent<FishPickupLabel>();
         }
 
         private void OnServerLineBroken()
@@ -494,7 +539,6 @@ namespace MultiplayerFishing
         {
             Debug.Log($"[NFC][Rpc] FloatDestroyed isServer={isServer} isOwned={isOwned} netId={netId}");
             ActiveFloatTransform = null;
-            // Tell FishingRod to clean up line rendering
             if (_fishingSystem != null && _fishingSystem._fishingRod != null)
                 _fishingSystem._fishingRod.FinishFishing();
         }
@@ -529,7 +573,6 @@ namespace MultiplayerFishing
 
         private void ApplyRodVisuals(bool equipped)
         {
-            // Skip on dedicated server (visuals already disabled)
             if (Application.isBatchMode) return;
 
             if (_rodGameObject != null)

@@ -63,6 +63,18 @@ namespace MultiplayerFishing
             // Float reference (line rendering + rod bending)
             _rod._fishingFloat = floatTransform;
 
+            // During Displaying, clear all fishing animation state
+            // DisplayFishIK handles hand positioning independently
+            if (state == FishingState.Displaying)
+            {
+                _fs._castFloat = false;
+                _fs._attractInput = false;
+                _fs._advanced._caughtLoot = false;
+                _rod._fishingFloat = null;
+                _rod.LootCaught(false);
+                return;
+            }
+
             // Loot caught for rod bending + HandIK
             // safeHooked: only true when we have loot data AND float exists
             bool hooked = (state == FishingState.Hooked);

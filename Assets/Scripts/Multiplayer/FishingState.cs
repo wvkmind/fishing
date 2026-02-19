@@ -10,6 +10,7 @@ namespace MultiplayerFishing
         Casting,
         Floating,
         Hooked,
-        LineBroken
+        LineBroken,
+        Displaying
     }
 }

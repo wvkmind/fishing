@@ -1747,6 +1747,7 @@ GameObject:
   - component: {fileID: 2805397373048712354}
   - component: {fileID: 9036412120091747655}
   - component: {fileID: 7685140432723909663}
+  - component: {fileID: 8742829054204468792}
   m_Layer: 6
   m_Name: PlayerPrefab
   m_TagString: Player
@@ -1836,7 +1837,7 @@ MonoBehaviour:
   _interactionRadius: 2
   _interactionLayerMask:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 0
   _interactionMark: {fileID: 1430493598208009157}
 --- !u!114 &7430040279728080239
 MonoBehaviour:
@@ -1856,7 +1857,7 @@ MonoBehaviour:
   _gravityAccel: 0.8
   _groundMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 0
   _groundCheckerSize: {x: 0.5, y: 0.1, z: 0.5}
   _tppCamera: {fileID: 8254193004186379534}
   _fppCamera: {fileID: 4976587259333035050}
@@ -1908,7 +1909,7 @@ MonoBehaviour:
   _forceChargeRate: 6
   _currentCastForce: 0
   _spawnFloatDelay: 0.8
-  _catchDistance: 3
+  _catchDistance: 3.5
   _showAdvancedSettings: 1
   _advanced:
     _caughtLootData: {fileID: 0}
@@ -1992,6 +1993,8 @@ MonoBehaviour:
   syncInterval: 0
   _fishingSystem: {fileID: 8174459846405231255}
   _networkFloatPrefab: {fileID: 2639365602873067901, guid: d3bd5a976cc9acc4889e9b1b68bc8a0a, type: 3}
+  _fishDatabase: {fileID: 11400000, guid: bb53429d2beb0234ab0e1fe4b8ca5f93, type: 2}
+  _pickupRange: 3
   syncState: 0
   syncAttractInput: 0
   syncLineLoad: 0
@@ -1999,6 +2002,7 @@ MonoBehaviour:
   syncLootName: 
   syncLootTier: 0
   syncLootDescription: 
+  syncRodEquipped: 0
 --- !u!114 &9036412120091747655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2045,6 +2049,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb5e6b24519cd2d4e82a80c9dcd879f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MultiplayerFishing.FishingUI
+--- !u!114 &8742829054204468792
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3638915616474005004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4239fb5d4bd0daa4aab4a8e3ca134212, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MultiplayerFishing.DisplayFishIK
+  _ikWeight: 1
+  _rotationWeight: 0.5
+  _leftHandRatio: 0.25
+  _rightHandRatio: -0.25
 --- !u!1 &3793600438790473493
 GameObject:
   m_ObjectHideFlags: 0
