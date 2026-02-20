@@ -180,10 +180,23 @@ public static class FishSetupEditor
             return null;
         }
 
-        // Always recreate prefab to ensure pivot offset is applied
+        // If prefab already exists, reuse it to preserve GUID (= Mirror assetId).
+        // Deleting and recreating would change the GUID, causing client/server mismatch.
         var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (existing != null)
-            AssetDatabase.DeleteAsset(prefabPath);
+        {
+            Debug.Log($"[FishSetup] Prefab already exists, reusing: {prefabPath}");
+            // Ensure it has NetworkIdentity
+            if (existing.GetComponent<NetworkIdentity>() == null)
+            {
+                var inst = (GameObject)PrefabUtility.InstantiatePrefab(existing);
+                inst.AddComponent<NetworkIdentity>();
+                PrefabUtility.SaveAsPrefabAsset(inst, prefabPath);
+                Object.DestroyImmediate(inst);
+                existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            }
+            return existing;
+        }
 
         var newInst = (GameObject)PrefabUtility.InstantiatePrefab(fbx);
         PrefabUtility.UnpackPrefabInstance(newInst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
