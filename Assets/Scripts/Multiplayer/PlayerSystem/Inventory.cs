@@ -11,18 +11,19 @@ public class Inventory
     public List<InventoryItem> items = new List<InventoryItem>();
 
     /// <summary>
-    /// 添加物品：已有相同 logicId 则数量增加，否则新建条目。
+    /// 添加物品：已有相同 logicId 则数量增加且重量累加，否则新建条目。
     /// </summary>
-    public void AddItem(string logicId, int count = 1)
+    public void AddItem(string logicId, int count = 1, float weight = 0f)
     {
         var existing = FindItem(logicId);
         if (existing != null)
         {
             existing.count += count;
+            existing.totalWeight += weight;
         }
         else
         {
-            items.Add(new InventoryItem { logicId = logicId, count = count });
+            items.Add(new InventoryItem { logicId = logicId, count = count, totalWeight = weight });
         }
     }
 

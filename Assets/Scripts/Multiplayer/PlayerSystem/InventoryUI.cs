@@ -275,63 +275,50 @@ public class InventoryUI : MonoBehaviour
 
         if (hasIcon)
         {
-            // Icon child — upper portion of card
+            // Icon — upper portion
             var iconGo = new GameObject("Icon");
             iconGo.transform.SetParent(cardGo.transform, false);
             var iconRect = iconGo.AddComponent<RectTransform>();
-            iconRect.anchorMin = new Vector2(0.1f, 0.35f);
-            iconRect.anchorMax = new Vector2(0.9f, 0.9f);
+            iconRect.anchorMin = new Vector2(0.1f, 0.4f);
+            iconRect.anchorMax = new Vector2(0.9f, 0.95f);
             iconRect.offsetMin = Vector2.zero;
             iconRect.offsetMax = Vector2.zero;
             var iconImg = iconGo.AddComponent<Image>();
             iconImg.sprite = entry.icon;
             iconImg.preserveAspect = true;
-
-            // Name child — lower portion below icon
-            var nameGo = new GameObject("Name");
-            nameGo.transform.SetParent(cardGo.transform, false);
-            var nameRect = nameGo.AddComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0f, 0.05f);
-            nameRect.anchorMax = new Vector2(1f, 0.35f);
-            nameRect.offsetMin = Vector2.zero;
-            nameRect.offsetMax = Vector2.zero;
-            var nameTmp = nameGo.AddComponent<TextMeshProUGUI>();
-            nameTmp.text = displayName;
-            nameTmp.fontSize = 14;
-            nameTmp.alignment = TextAlignmentOptions.Center;
-            nameTmp.color = Color.white;
         }
-        else
+
+        // "名字 x数量" — below icon
+        string nameCountStr = item.count > 1 ? $"{displayName} x{item.count}" : displayName;
+        var nameGo = new GameObject("Name");
+        nameGo.transform.SetParent(cardGo.transform, false);
+        var nameRect = nameGo.AddComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0f, 0.15f);
+        nameRect.anchorMax = new Vector2(1f, hasIcon ? 0.4f : 0.6f);
+        nameRect.offsetMin = Vector2.zero;
+        nameRect.offsetMax = Vector2.zero;
+        var nameTmp = nameGo.AddComponent<TextMeshProUGUI>();
+        nameTmp.text = nameCountStr;
+        nameTmp.fontSize = 13;
+        nameTmp.alignment = TextAlignmentOptions.Center;
+        nameTmp.color = Color.white;
+
+        // Total weight — bottom line
+        if (item.totalWeight > 0f)
         {
-            // No icon — name centered in card as text-only fallback
-            var nameGo = new GameObject("Name");
-            nameGo.transform.SetParent(cardGo.transform, false);
-            var nameRect = nameGo.AddComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0.05f, 0.05f);
-            nameRect.anchorMax = new Vector2(0.95f, 0.95f);
-            nameRect.offsetMin = Vector2.zero;
-            nameRect.offsetMax = Vector2.zero;
-            var nameTmp = nameGo.AddComponent<TextMeshProUGUI>();
-            nameTmp.text = displayName;
-            nameTmp.fontSize = 16;
-            nameTmp.alignment = TextAlignmentOptions.Center;
-            nameTmp.color = Color.white;
+            var weightGo = new GameObject("Weight");
+            weightGo.transform.SetParent(cardGo.transform, false);
+            var weightRect = weightGo.AddComponent<RectTransform>();
+            weightRect.anchorMin = new Vector2(0f, 0f);
+            weightRect.anchorMax = new Vector2(1f, 0.18f);
+            weightRect.offsetMin = Vector2.zero;
+            weightRect.offsetMax = Vector2.zero;
+            var weightTmp = weightGo.AddComponent<TextMeshProUGUI>();
+            weightTmp.text = $"{item.totalWeight:F2} kg";
+            weightTmp.fontSize = 12;
+            weightTmp.alignment = TextAlignmentOptions.Center;
+            weightTmp.color = new Color(0.7f, 0.9f, 1f);
         }
-
-        // Count child — bottom-right, visible only when count > 1
-        var countGo = new GameObject("Count");
-        countGo.transform.SetParent(cardGo.transform, false);
-        var countRect = countGo.AddComponent<RectTransform>();
-        countRect.anchorMin = new Vector2(0.55f, 0f);
-        countRect.anchorMax = new Vector2(1f, 0.2f);
-        countRect.offsetMin = Vector2.zero;
-        countRect.offsetMax = Vector2.zero;
-        var countTmp = countGo.AddComponent<TextMeshProUGUI>();
-        countTmp.text = $"x{item.count}";
-        countTmp.fontSize = 14;
-        countTmp.alignment = TextAlignmentOptions.Right;
-        countTmp.color = new Color(0.8f, 0.8f, 0.3f, 1f);
-        countGo.SetActive(item.count > 1);
 
         // Wire click handler for selection and inspect
         string logicId = item.logicId;

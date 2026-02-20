@@ -71,6 +71,9 @@ public class PlayerAuthenticator : NetworkAuthenticator
     /// <summary>
     /// 处理客户端发来的验证请求。
     /// playerId 非空时查找已有玩家；playerName 非空时创建新玩家；都为空则拒绝。
+    /// 注意：playerId 查找失败时不调用 ServerReject（不断开连接），
+    /// 而是发送失败响应让客户端显示 NameInputUI 重新发送 playerName 请求。
+    /// 这避免了 conn.Send + ServerReject 的竞态条件导致 KCP RawSend invalid connectionId。
     /// </summary>
     public void OnAuthRequestMessage(NetworkConnectionToClient conn, AuthRequestMessage msg)
     {
@@ -91,13 +94,15 @@ public class PlayerAuthenticator : NetworkAuthenticator
             }
             else
             {
+                // playerId 不存在（例如客户端本地存档来自另一台服务器）。
+                // 不调用 ServerReject — 保持连接，让客户端显示 NameInputUI 重试。
+                Debug.LogWarning($"[PlayerAuthenticator] playerId '{msg.playerId}' not found, asking client to re-register");
                 conn.Send(new AuthResponseMessage
                 {
                     success = false,
                     playerDataJson = "",
                     errorMessage = "玩家不存在"
                 });
-                ServerReject(conn);
             }
             return;
         }
@@ -117,7 +122,7 @@ public class PlayerAuthenticator : NetworkAuthenticator
             return;
         }
 
-        // playerId 和 playerName 都为空，拒绝连接
+        // playerId 和 playerName 都为空，真正的无效请求才断开
         conn.Send(new AuthResponseMessage
         {
             success = false,

@@ -34,6 +34,14 @@ namespace MultiplayerFishing
         private GameObject _escMenuRoot;
         private bool _escMenuVisible;
 
+        // Catch Info UI (shown during Displaying state)
+        private GameObject _catchInfoRoot;
+        private TMP_Text _catchNameText;
+        private TMP_Text _catchDescText;
+        private TMP_Text _catchWeightText;
+        private TMP_Text _catchRecordText;
+        private TMP_Text _catchNewRecordText;
+
         // Cached references for input blocking
         private CharacterMovement _charMovement;
 
@@ -79,6 +87,7 @@ namespace MultiplayerFishing
             UpdateCastBar(isCharging, currentCastForce);
             UpdateLineLoadBar();
             UpdateLootInfo();
+            UpdateCatchInfo();
         }
 
         // ── Cast Bar: uses localScale.x for progress (like original SimpleUIManager) ──
@@ -129,6 +138,90 @@ namespace MultiplayerFishing
                     // Hidden: don't reveal fish identity until caught — more fun
                     _lootInfoText.gameObject.SetActive(false);
                 }
+
+        // ── Catch Info (Displaying state) ──
+        private void UpdateCatchInfo()
+        {
+            // Auto-hide when leaving Displaying state
+            if (_catchInfoRoot != null && _catchInfoRoot.activeSelf
+                && _controller.syncState != FishingState.Displaying)
+            {
+                _catchInfoRoot.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// 由 NetworkFishingController.TargetShowCatchInfo 调用，展示钓获信息。
+        /// </summary>
+        public void ShowCatchInfo(string fishName, string description, float weight, float previousRecord, bool isNewRecord)
+        {
+            if (_catchInfoRoot == null)
+                BuildCatchInfoUI();
+
+            _catchNameText.text = fishName;
+            _catchDescText.text = description;
+            _catchWeightText.text = $"{weight:F2} kg";
+
+            if (isNewRecord)
+            {
+                _catchRecordText.text = previousRecord > 0f
+                    ? $"Previous: {previousRecord:F2} kg"
+                    : "";
+                _catchNewRecordText.text = "NEW RECORD!";
+                _catchNewRecordText.gameObject.SetActive(true);
+            }
+            else
+            {
+                _catchRecordText.text = $"Record: {previousRecord:F2} kg";
+                _catchNewRecordText.gameObject.SetActive(false);
+            }
+
+            _catchInfoRoot.SetActive(true);
+        }
+
+        private void BuildCatchInfoUI()
+        {
+            _catchInfoRoot = new GameObject("CatchInfo");
+            _catchInfoRoot.transform.SetParent(_canvas.transform, false);
+            var rootRect = _catchInfoRoot.AddComponent<RectTransform>();
+            rootRect.anchorMin = new Vector2(0.5f, 0.5f);
+            rootRect.anchorMax = new Vector2(0.5f, 0.5f);
+            rootRect.anchoredPosition = new Vector2(0f, -200f);
+            rootRect.sizeDelta = new Vector2(360f, 180f);
+
+            var bg = _catchInfoRoot.AddComponent<Image>();
+            bg.color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
+
+            // Fish name (top)
+            _catchNameText = CreateText(_catchInfoRoot.transform, "CatchName",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(340f, 36f),
+                26, Color.white);
+            _catchNameText.fontStyle = TMPro.FontStyles.Bold;
+
+            // Weight
+            _catchWeightText = CreateText(_catchInfoRoot.transform, "CatchWeight",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 25f), new Vector2(340f, 28f),
+                22, new Color(0.7f, 0.9f, 1f));
+
+            // Description
+            _catchDescText = CreateText(_catchInfoRoot.transform, "CatchDesc",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(340f, 24f),
+                16, new Color(0.7f, 0.7f, 0.7f));
+
+            // Record info
+            _catchRecordText = CreateText(_catchInfoRoot.transform, "CatchRecord",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -40f), new Vector2(340f, 24f),
+                16, new Color(0.6f, 0.6f, 0.6f));
+
+            // NEW RECORD! (flashy)
+            _catchNewRecordText = CreateText(_catchInfoRoot.transform, "NewRecord",
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -65f), new Vector2(340f, 30f),
+                22, new Color(1f, 0.85f, 0.1f));
+            _catchNewRecordText.fontStyle = TMPro.FontStyles.Bold;
+            _catchNewRecordText.gameObject.SetActive(false);
+
+            _catchInfoRoot.SetActive(false);
+        }
 
 
         // ── ESC Menu ──

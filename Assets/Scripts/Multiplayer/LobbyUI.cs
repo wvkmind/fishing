@@ -155,35 +155,25 @@ namespace MultiplayerFishing
 
         private void BuildAuthenticatedPanel()
         {
-            _authPanel = CreatePanel(_canvas.transform, new Vector2(400f, 420f));
+            _authPanel = CreatePanel(_canvas.transform, new Vector2(400f, 320f));
 
             // Player name at top
             _playerNameText = CreateText(_authPanel.transform, "", 28,
-                new Vector2(0f, 150f), new Vector2(360f, 40f));
+                new Vector2(0f, 110f), new Vector2(360f, 40f));
             _playerNameText.color = new Color(0.3f, 0.9f, 0.3f);
 
             // "地图选择" label
             var mapLabel = CreateText(_authPanel.transform, "Select Map", 22,
-                new Vector2(0f, 90f), new Vector2(360f, 30f));
+                new Vector2(0f, 50f), new Vector2(360f, 30f));
             mapLabel.color = new Color(0.8f, 0.8f, 0.8f);
 
-            // Map selection display — show current map with highlight
-            BuildMapList(_authPanel.transform, new Vector2(0f, 30f));
-
-            // "进入游戏" button
-            TMP_Text _;
-            CreateButton(_authPanel.transform, "Enter Game",
-                new Vector2(0f, -50f), new Vector2(280f, 50f),
-                new Color(0.2f, 0.5f, 0.8f), OnEnterGame, out _);
-
-            // "背包" button
-            CreateButton(_authPanel.transform, "Inventory",
-                new Vector2(0f, -110f), new Vector2(280f, 50f),
-                new Color(0.4f, 0.4f, 0.6f), OnOpenInventory, out _);
+            // Map selection display — clicking a map directly enters the game
+            BuildMapList(_authPanel.transform, new Vector2(0f, -10f));
 
             // "退出" button
+            TMP_Text _;
             CreateButton(_authPanel.transform, "Quit",
-                new Vector2(0f, -170f), new Vector2(280f, 50f),
+                new Vector2(0f, -100f), new Vector2(280f, 50f),
                 new Color(0.6f, 0.2f, 0.2f), OnDisconnectAndQuit, out _);
         }
 
@@ -233,14 +223,8 @@ namespace MultiplayerFishing
         private void OnSelectMap(int index)
         {
             _selectedMapIndex = index;
-            // Rebuild auth panel to update selection highlight
-            if (_authPanel != null)
-            {
-                Object.Destroy(_authPanel);
-                _authPanel = null;
-            }
-            BuildAuthenticatedPanel();
-            UpdateAuthPanelPlayerName();
+            // 点击地图直接进入游戏
+            OnEnterGame();
         }
 
         /// <summary>
@@ -262,11 +246,14 @@ namespace MultiplayerFishing
                 // Host mode — directly change scene
                 nm.ServerChangeScene(sceneName);
             }
-            else
+            else if (NetworkClient.isConnected)
             {
-                // Client-only mode — server controls scene loading.
-                // For now, log that the client requested a map change.
-                Debug.Log($"[LobbyUI] Client requested map: {AvailableMaps[_selectedMapIndex].mapName} ({sceneName})");
+                // Client-only mode — 发送场景切换请求给服务器
+                NetworkClient.Send(new SceneChangeRequestMessage
+                {
+                    sceneName = sceneName
+                });
+                Debug.Log($"[LobbyUI] Sent scene change request: {sceneName}");
             }
         }
 

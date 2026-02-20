@@ -36,6 +36,7 @@ namespace MultiplayerFishing
         [SyncVar] public string syncLootLogicId;
         [SyncVar] public int syncLootTier;
         [SyncVar] public string syncLootDescription;
+        [SyncVar] public float syncLootWeight;
         [SyncVar(hook = nameof(OnRodEquippedChanged))] public bool syncRodEquipped;
 
         // ── Public accessor for other components (e.g. NetworkFishingRod) ──
@@ -472,7 +473,8 @@ namespace MultiplayerFishing
 
             // ── Inventory integration: add fish to player's inventory ──
             string logicId = syncLootLogicId;
-            Debug.Log($"[NFC][Server] CmdPickupFish logicId='{logicId}' registryNull={_itemRegistry == null} netId={netId}");
+            float weight = syncLootWeight;
+            Debug.Log($"[NFC][Server] CmdPickupFish logicId='{logicId}' weight={weight:F2} registryNull={_itemRegistry == null} netId={netId}");
             if (!string.IsNullOrEmpty(logicId) && _itemRegistry != null)
             {
                 var entry = _itemRegistry.FindByLogicId(logicId);
@@ -485,9 +487,14 @@ namespace MultiplayerFishing
                         var playerData = storage.FindPlayer(playerId);
                         if (playerData != null)
                         {
-                            playerData.inventory.AddItem(entry.logicId);
+                            playerData.inventory.AddItem(entry.logicId, 1, weight);
+
+                            // 检查并更新钓鱼纪录
+                            bool isNewRecord = playerData.TryUpdateFishRecord(entry.logicId, weight);
+                            Debug.Log($"[NFC][Server] Fish record check: logicId='{entry.logicId}' weight={weight:F2} isNewRecord={isNewRecord}");
+
                             storage.SavePlayer(playerData);
-                            Debug.Log($"[NFC][Server] Added '{entry.logicId}' to inventory for player '{playerId}'");
+                            Debug.Log($"[NFC][Server] Added '{entry.logicId}' weight={weight:F2} to inventory for player '{playerId}'");
 
                             // Notify the owning client to refresh inventory UI
                             string inventoryJson = UnityEngine.JsonUtility.ToJson(playerData.inventory);
@@ -515,6 +522,7 @@ namespace MultiplayerFishing
             syncLootLogicId = null;
             syncLootTier = 0;
             syncLootDescription = null;
+            syncLootWeight = 0f;
             _stateMachine.DismissDisplay();
             _presenter?.ClearLootData();
 
@@ -572,6 +580,19 @@ namespace MultiplayerFishing
             }
         }
 
+        /// <summary>
+        /// 服务端通知拥有者客户端展示钓获信息（鱼名、说明、重量、是否新纪录）。
+        /// </summary>
+        [TargetRpc]
+        private void TargetShowCatchInfo(NetworkConnectionToClient conn,
+            string fishName, string description, float weight, float previousRecord, bool isNewRecord)
+        {
+            if (Application.isBatchMode) return;
+            Debug.Log($"[NFC][Client] TargetShowCatchInfo: {fishName} weight={weight:F2} prev={previousRecord:F2} newRecord={isNewRecord}");
+            if (_fishingUI != null)
+                _fishingUI.ShowCatchInfo(fishName, description, weight, previousRecord, isNewRecord);
+        }
+
         // ══════════════════════════════════════════════════════════════
         //  Server callbacks (from FishingStateMachine)
         // ══════════════════════════════════════════════════════════════
@@ -590,6 +611,7 @@ namespace MultiplayerFishing
                 syncLootLogicId = null;
                 syncLootTier = 0;
                 syncLootDescription = null;
+                syncLootWeight = 0f;
                 _presenter?.ClearLootData();
             }
         }
@@ -611,6 +633,7 @@ namespace MultiplayerFishing
             syncLootName = lootData._lootName;
             syncLootTier = (int)lootData._lootTier;
             syncLootDescription = lootData._lootDescription;
+            syncLootWeight = weight;
 
             // Resolve logicId from ItemRegistry by display name
             if (_itemRegistry != null)
@@ -655,6 +678,28 @@ namespace MultiplayerFishing
 
             NetworkServer.Spawn(_serverDroppedFish);
             RpcAttachFishToHand(_serverDroppedFish.GetComponent<NetworkIdentity>());
+
+            // 查询个人纪录，通知客户端展示钓获信息
+            float previousRecord = 0f;
+            bool isNewRecord = false;
+            string logicId = syncLootLogicId;
+            if (!string.IsNullOrEmpty(logicId))
+            {
+                var storage = PlayerAuthenticator.Storage;
+                if (storage != null &&
+                    PlayerAuthenticator.ConnectionPlayerMap.TryGetValue(connectionToClient, out string playerId))
+                {
+                    var playerData = storage.FindPlayer(playerId);
+                    if (playerData != null)
+                    {
+                        var record = playerData.FindFishRecord(logicId);
+                        previousRecord = record != null ? record.maxWeight : 0f;
+                        isNewRecord = syncLootWeight > previousRecord;
+                    }
+                }
+            }
+            TargetShowCatchInfo(connectionToClient, syncLootName, syncLootDescription,
+                syncLootWeight, previousRecord, isNewRecord);
 
             // Enter Displaying state
             syncState = FishingState.Displaying;
