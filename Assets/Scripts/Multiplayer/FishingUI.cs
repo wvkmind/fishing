@@ -17,6 +17,7 @@ namespace MultiplayerFishing
         private float _maxCastForce;
         private float _maxLineLoad;
         private float _overLoadDuration;
+        private ItemRegistry _itemRegistry;
 
         // Runtime UI references
         private Canvas _canvas;
@@ -58,8 +59,10 @@ namespace MultiplayerFishing
             _maxLineLoad = maxLineLoad;
             _overLoadDuration = overLoadDuration;
             _charMovement = controller.GetComponent<CharacterMovement>();
+            _itemRegistry = controller.ItemRegistry;
             BuildUI();
             _initialized = true;
+            Debug.Log("[FishingUI] Initialized successfully");
 
             // Lock cursor on start
             Cursor.lockState = CursorLockMode.Locked;
@@ -70,7 +73,9 @@ namespace MultiplayerFishing
         {
             if (!_initialized) return;
 
+            HandleInspectionInput();
             HandleEscMenu();
+            HandleInventoryKey();
             UpdateCastBar(isCharging, currentCastForce);
             UpdateLineLoadBar();
             UpdateLootInfo();
@@ -127,9 +132,76 @@ namespace MultiplayerFishing
 
 
         // ── ESC Menu ──
+        private InventoryUI _inventoryUI;
+        private bool _inventoryVisible;
+
+        private void HandleInspectionInput()
+        {
+            if (_inventoryUI == null || !_inventoryUI.IsInspecting) return;
+            if (!Input.GetKeyDown(KeyCode.E)) return;
+
+            _inventoryUI.ExitInspection();
+            _inventoryUI.Hide();
+            _inventoryVisible = false;
+            SetInputBlocked(false);
+        }
+
+        private void HandleInventoryKey()
+        {
+            if (!Input.GetKeyDown(KeyCode.I)) return;
+            if (_escMenuVisible) return; // Don't toggle inventory while ESC menu is open
+            if (_inventoryUI != null && _inventoryUI.IsInspecting) return; // Block I key during inspection
+
+            _inventoryVisible = !_inventoryVisible;
+
+            if (_inventoryVisible)
+            {
+                if (_inventoryUI == null)
+                {
+                    var go = new GameObject("InventoryUI");
+                    _inventoryUI = go.AddComponent<InventoryUI>();
+                }
+                var playerData = PlayerAuthenticator.LocalPlayerData;
+                if (playerData != null)
+                {
+                    Debug.Log($"[FishingUI] Opening inventory, items count={playerData.inventory?.items?.Count ?? 0}, registryNull={_itemRegistry == null}");
+                    _inventoryUI.Show(playerData.inventory, _itemRegistry);
+                }
+                else
+                {
+                    Debug.LogWarning("[FishingUI] Cannot open inventory: LocalPlayerData is null");
+                }
+                SetInputBlocked(true);
+            }
+            else
+            {
+                if (_inventoryUI != null)
+                    _inventoryUI.Hide();
+                SetInputBlocked(false);
+            }
+        }
+
         private void HandleEscMenu()
         {
             if (!Input.GetKeyDown(KeyCode.Escape)) return;
+
+            // If inspecting a fish, exit inspection first (consume ESC press)
+            if (_inventoryUI != null && _inventoryUI.IsInspecting)
+            {
+                _inventoryUI.ExitInspection();
+                _inventoryVisible = false;
+                SetInputBlocked(false);
+                return;
+            }
+
+            // If inventory is open, close it first instead of toggling ESC menu
+            if (_inventoryVisible)
+            {
+                _inventoryVisible = false;
+                if (_inventoryUI != null) _inventoryUI.Hide();
+                SetInputBlocked(false);
+                return;
+            }
 
             _escMenuVisible = !_escMenuVisible;
             _escMenuRoot.SetActive(_escMenuVisible);

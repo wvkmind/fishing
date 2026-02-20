@@ -1995,6 +1995,7 @@ MonoBehaviour:
   _fishingSystem: {fileID: 8174459846405231255}
   _networkFloatPrefab: {fileID: 2639365602873067901, guid: d3bd5a976cc9acc4889e9b1b68bc8a0a, type: 3}
   _fishDatabase: {fileID: 11400000, guid: bb53429d2beb0234ab0e1fe4b8ca5f93, type: 2}
+  _itemRegistry: {fileID: 11400000, guid: 05676835ff3b6834ead3e3cfffdc4baf, type: 2}
   syncState: 0
   syncAttractInput: 0
   syncLineLoad: 0

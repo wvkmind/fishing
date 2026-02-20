@@ -120,7 +120,20 @@ namespace MultiplayerFishing
                 fppCamera.enabled = isLocal;
 
             if (audioListener != null)
+            {
                 audioListener.enabled = isLocal;
+
+                // When enabling local player's AudioListener, disable all others to avoid
+                // "There are 2 audio listeners in the scene" warning
+                if (isLocal)
+                {
+                    foreach (var al in Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+                    {
+                        if (al != audioListener)
+                            al.enabled = false;
+                    }
+                }
+            }
 
             // Enable/disable camera control scripts
             if (tppCamera != null)

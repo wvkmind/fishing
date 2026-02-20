@@ -1,0 +1,141 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97902e0f40871204bb86c571eeb89ab5, type: 3}
+  m_Name: ItemRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::ItemRegistry
+  entries:
+  - logicId: fish_bigeye_tuna
+    itemType: 0
+    displayName: Bigeye Tuna
+    description: A large deep-sea tuna with big eyes
+    icon: {fileID: 444922037, guid: 021b46624296b5f4486d7f61e1e0a490, type: 3}
+    prefab: {fileID: 2685983310992776639, guid: 95fe7fe032d166043afb6fc565c7e093, type: 3}
+    isCatchable: 1
+    minLength: 20
+    maxLength: 50
+    minWeight: 15
+    maxWeight: 40
+    lootTier: 2
+    lootRarity: 20
+    price: 200
+    experienceValue: 25
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []
+  - logicId: fish_yellow_croaker
+    itemType: 0
+    displayName: Yellow Croaker
+    description: A common coastal fish with golden scales
+    icon: {fileID: -2107247534, guid: 54f2da0231d4da84792bfa9885feb73f, type: 3}
+    prefab: {fileID: 5123061733759579155, guid: 68cb0738286286a43933cf0a4a31562d, type: 3}
+    isCatchable: 1
+    minLength: 10
+    maxLength: 30
+    minWeight: 0.3
+    maxWeight: 2
+    lootTier: 0
+    lootRarity: 20
+    price: 50
+    experienceValue: 5
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []
+  - logicId: fish_moorish_idol
+    itemType: 0
+    displayName: Moorish Idol
+    description: A striking reef fish with bold black and yellow stripes
+    icon: {fileID: -1609507753, guid: e41425c6b30c1b146b3a6ef6f383de48, type: 3}
+    prefab: {fileID: 1284612768619343899, guid: a71461d670888684786680ac120ef6cf, type: 3}
+    isCatchable: 1
+    minLength: 10
+    maxLength: 25
+    minWeight: 0.3
+    maxWeight: 1.5
+    lootTier: 1
+    lootRarity: 20
+    price: 80
+    experienceValue: 10
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []
+  - logicId: fish_brown_rabbitfish
+    itemType: 0
+    displayName: Brown Rabbitfish
+    description: A herbivorous reef fish with venomous dorsal spines
+    icon: {fileID: -52113027, guid: 9cad4fd6efa809b47b216031e828d8d0, type: 3}
+    prefab: {fileID: 5281671064087001228, guid: b81f945d8f99c5c4b8e8c500053fc1e7, type: 3}
+    isCatchable: 1
+    minLength: 8
+    maxLength: 20
+    minWeight: 0.2
+    maxWeight: 1
+    lootTier: 0
+    lootRarity: 20
+    price: 40
+    experienceValue: 5
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []
+  - logicId: fish_thickhead_scorpionfish
+    itemType: 0
+    displayName: Thickhead Scorpionfish
+    description: A well-camouflaged bottom dweller with a large head
+    icon: {fileID: 2006564031, guid: bf7afbf272774884ca480849449ce64a, type: 3}
+    prefab: {fileID: 8891676150184605956, guid: 7281250370371de419b52d1b39971aae, type: 3}
+    isCatchable: 1
+    minLength: 10
+    maxLength: 35
+    minWeight: 0.5
+    maxWeight: 3
+    lootTier: 1
+    lootRarity: 20
+    price: 90
+    experienceValue: 10
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []
+  - logicId: fish_emperor_snapper
+    itemType: 0
+    displayName: Emperor Snapper
+    description: A prized large snapper found near coral reefs
+    icon: {fileID: 546679896, guid: a3adf209432b164448cafe847ee0f7fd, type: 3}
+    prefab: {fileID: 7245264796316920109, guid: 28567b186774ed74e939ee28dfe7e6b8, type: 3}
+    isCatchable: 1
+    minLength: 30
+    maxLength: 80
+    minWeight: 5
+    maxWeight: 25
+    lootTier: 3
+    lootRarity: 20
+    price: 500
+    experienceValue: 50
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []
+  - logicId: fish_chub_mackerel
+    itemType: 0
+    displayName: Chub Mackerel
+    description: A fast-swimming pelagic fish common in coastal waters
+    icon: {fileID: 32695554, guid: 691f4b47e5fa5ec4895a27e370e3cb9a, type: 3}
+    prefab: {fileID: 445886330007462098, guid: da637a59ee3f34f48a683b16fc84c7a2, type: 3}
+    isCatchable: 1
+    minLength: 10
+    maxLength: 35
+    minWeight: 0.3
+    maxWeight: 2.5
+    lootTier: 0
+    lootRarity: 20
+    price: 45
+    experienceValue: 5
+    allowedRods: []
+    allowedBaits: []
+    allowedLocations: []

@@ -24,18 +24,23 @@ namespace MultiplayerFishing
         [Header("Fish Display")]
         [SerializeField] private FishDatabase _fishDatabase;
 
+        [Header("Player System")]
+        [SerializeField] private ItemRegistry _itemRegistry;
+
         // ── SyncVars ──
         [SyncVar] public FishingState syncState;
         [SyncVar] public bool syncAttractInput;
         [SyncVar] public float syncLineLoad;
         [SyncVar] public float syncOverLoad;
         [SyncVar] public string syncLootName;
+        [SyncVar] public string syncLootLogicId;
         [SyncVar] public int syncLootTier;
         [SyncVar] public string syncLootDescription;
         [SyncVar(hook = nameof(OnRodEquippedChanged))] public bool syncRodEquipped;
 
         // ── Public accessor for other components (e.g. NetworkFishingRod) ──
         public Transform ActiveFloatTransform { get; private set; }
+        public ItemRegistry ItemRegistry => _itemRegistry;
 
         // ── Server-only ──
         private FishingStateMachine _stateMachine;
@@ -141,23 +146,94 @@ namespace MultiplayerFishing
 
             if (isOwned)
             {
-                var fishingUI = GetComponentInChildren<FishingUI>(true);
-                if (fishingUI != null)
+                // Only initialize FishingUI in GameScene, not in LobbyScene
+                var activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                bool isGameScene = activeScene.name.Contains("GameScene");
+
+                if (isGameScene)
                 {
-                    fishingUI.Initialize(
-                        this,
-                        _fishingSystem._maxCastForce,
-                        _fishingSystem._fishingRod._lineStatus._maxLineLoad,
-                        _fishingSystem._fishingRod._lineStatus._overLoadDuration);
-                    _fishingUI = fishingUI;
+                    var fishingUI = GetComponentInChildren<FishingUI>(true);
+                    if (fishingUI != null)
+                    {
+                        fishingUI.Initialize(
+                            this,
+                            _fishingSystem._maxCastForce,
+                            _fishingSystem._fishingRod._lineStatus._maxLineLoad,
+                            _fishingSystem._fishingRod._lineStatus._overLoadDuration);
+                        _fishingUI = fishingUI;
+                    }
                 }
+                else
+                {
+                    // In lobby: unlock cursor, disable character movement & physics
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
+                    if (charMove != null) charMove.enabled = false;
+                    var rb = GetComponent<Rigidbody>();
+                    if (rb != null) { rb.isKinematic = true; }
+                    var cc = GetComponent<CharacterController>();
+                    if (cc != null) cc.enabled = false;
+                    // Place player at safe position
+                    transform.position = new Vector3(0f, 1f, 0f);
+
+                    // Listen for scene change to re-initialize when entering GameScene
+                    UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoadedForInit;
+                }
+            }
+        }
+
+        private void OnSceneLoadedForInit(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            if (!isOwned || _fishingSystem == null) return;
+            if (!scene.name.Contains("GameScene")) return;
+
+            // Unsubscribe — only need this once
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoadedForInit;
+
+            // Re-enable character movement & physics
+            var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
+            if (charMove != null) charMove.enabled = true;
+            var rb = GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+            var cc = GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = true;
+
+            // Initialize FishingUI now
+            var fishingUI = GetComponentInChildren<FishingUI>(true);
+            if (fishingUI != null && _fishingUI == null)
+            {
+                fishingUI.Initialize(
+                    this,
+                    _fishingSystem._maxCastForce,
+                    _fishingSystem._fishingRod._lineStatus._maxLineLoad,
+                    _fishingSystem._fishingRod._lineStatus._overLoadDuration);
+                _fishingUI = fishingUI;
             }
         }
 
         private void Update()
         {
             if (isOwned)
+            {
                 HandleLocalInput();
+
+                // Inventory key handling — runs even if _fishingUI is not yet initialized
+                if (_fishingUI == null && Input.GetKeyDown(KeyCode.I))
+                {
+                    Debug.LogWarning("[NFC] _fishingUI is null — attempting late init");
+                    var fishingUI = GetComponentInChildren<FishingUI>(true);
+                    if (fishingUI != null)
+                    {
+                        fishingUI.Initialize(
+                            this,
+                            _fishingSystem._maxCastForce,
+                            _fishingSystem._fishingRod._lineStatus._maxLineLoad,
+                            _fishingSystem._fishingRod._lineStatus._overLoadDuration);
+                        _fishingUI = fishingUI;
+                    }
+                }
+            }
 
             if (isServer && _stateMachine != null && _spawnedFloat != null)
                 ServerTick();
@@ -394,6 +470,37 @@ namespace MultiplayerFishing
             Debug.Log($"[NFC][Server] CmdPickupFish netId={netId}");
             if (_stateMachine == null || _stateMachine.State != FishingState.Displaying) return;
 
+            // ── Inventory integration: add fish to player's inventory ──
+            string logicId = syncLootLogicId;
+            Debug.Log($"[NFC][Server] CmdPickupFish logicId='{logicId}' registryNull={_itemRegistry == null} netId={netId}");
+            if (!string.IsNullOrEmpty(logicId) && _itemRegistry != null)
+            {
+                var entry = _itemRegistry.FindByLogicId(logicId);
+                if (entry != null)
+                {
+                    var storage = PlayerAuthenticator.Storage;
+                    if (storage != null &&
+                        PlayerAuthenticator.ConnectionPlayerMap.TryGetValue(connectionToClient, out string playerId))
+                    {
+                        var playerData = storage.FindPlayer(playerId);
+                        if (playerData != null)
+                        {
+                            playerData.inventory.AddItem(entry.logicId);
+                            storage.SavePlayer(playerData);
+                            Debug.Log($"[NFC][Server] Added '{entry.logicId}' to inventory for player '{playerId}'");
+
+                            // Notify the owning client to refresh inventory UI
+                            string inventoryJson = UnityEngine.JsonUtility.ToJson(playerData.inventory);
+                            TargetInventoryUpdated(connectionToClient, inventoryJson);
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[PlayerSystem] Fish logicId '{logicId}' not found in ItemRegistry");
+                }
+            }
+
             if (_serverDroppedFish != null)
             {
                 NetworkServer.Destroy(_serverDroppedFish);
@@ -405,6 +512,7 @@ namespace MultiplayerFishing
             // Return to idle
             syncState = FishingState.Idle;
             syncLootName = null;
+            syncLootLogicId = null;
             syncLootTier = 0;
             syncLootDescription = null;
             _stateMachine.DismissDisplay();
@@ -425,6 +533,45 @@ namespace MultiplayerFishing
             }
         }
 
+        /// <summary>
+        /// 服务端通知拥有者客户端背包已更新，客户端刷新本地 PlayerData 和 InventoryUI。
+        /// </summary>
+        [TargetRpc]
+        private void TargetInventoryUpdated(NetworkConnectionToClient conn, string inventoryJson)
+        {
+            Debug.Log($"[NFC][Client] TargetInventoryUpdated received, json length={inventoryJson?.Length ?? 0}");
+
+            if (PlayerAuthenticator.LocalPlayerData != null)
+            {
+                var updatedInventory = UnityEngine.JsonUtility.FromJson<Inventory>(inventoryJson);
+                if (updatedInventory != null)
+                {
+                    PlayerAuthenticator.LocalPlayerData.inventory = updatedInventory;
+                    Debug.Log($"[NFC][Client] Inventory updated, items count={updatedInventory.items?.Count ?? 0}");
+                    if (updatedInventory.items != null)
+                    {
+                        foreach (var item in updatedInventory.items)
+                            Debug.Log($"[NFC][Client]   item: logicId='{item.logicId}' count={item.count}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[NFC][Client] Failed to deserialize inventory JSON");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[NFC][Client] LocalPlayerData is null, cannot update inventory");
+            }
+
+            // Refresh InventoryUI if it's currently open
+            var inventoryUI = FindAnyObjectByType<InventoryUI>();
+            if (inventoryUI != null)
+            {
+                inventoryUI.Refresh(PlayerAuthenticator.LocalPlayerData?.inventory);
+            }
+        }
+
         // ══════════════════════════════════════════════════════════════
         //  Server callbacks (from FishingStateMachine)
         // ══════════════════════════════════════════════════════════════
@@ -440,6 +587,7 @@ namespace MultiplayerFishing
                 syncLineLoad = 0f;
                 syncOverLoad = 0f;
                 syncLootName = null;
+                syncLootLogicId = null;
                 syncLootTier = 0;
                 syncLootDescription = null;
                 _presenter?.ClearLootData();
@@ -463,6 +611,16 @@ namespace MultiplayerFishing
             syncLootName = lootData._lootName;
             syncLootTier = (int)lootData._lootTier;
             syncLootDescription = lootData._lootDescription;
+
+            // Resolve logicId from ItemRegistry by display name
+            if (_itemRegistry != null)
+            {
+                var entry = _itemRegistry.FindByDisplayName(lootData._lootName);
+                syncLootLogicId = entry != null ? entry.logicId : null;
+                if (entry == null)
+                    Debug.LogWarning($"[NFC][Server] No ItemRegistryEntry for displayName '{lootData._lootName}'");
+            }
+
             RpcOnLootSelected(lootData._lootName, (int)lootData._lootTier, lootData._lootDescription);
         }
 

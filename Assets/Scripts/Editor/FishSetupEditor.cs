@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEditor;
 using Mirror;
@@ -10,6 +11,7 @@ using MultiplayerFishing;
 /// then wires them into the scene's water FishingLoot component.
 /// Also creates Network prefabs (with NetworkIdentity) for multiplayer catch display.
 /// </summary>
+[Obsolete("已由 ItemConfigEditor 替代，请使用 Tools/Item Config Editor 窗口")]
 public static class FishSetupEditor
 {
     private const string FishPrefabDir = "Assets/Prefabs/Fish";
@@ -192,7 +194,7 @@ public static class FishSetupEditor
                 var inst = (GameObject)PrefabUtility.InstantiatePrefab(existing);
                 inst.AddComponent<NetworkIdentity>();
                 PrefabUtility.SaveAsPrefabAsset(inst, prefabPath);
-                Object.DestroyImmediate(inst);
+                UnityEngine.Object.DestroyImmediate(inst);
                 existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             }
             return existing;
@@ -248,7 +250,7 @@ public static class FishSetupEditor
             newInst.AddComponent<NetworkIdentity>();
 
         var prefab = PrefabUtility.SaveAsPrefabAsset(newInst, prefabPath);
-        Object.DestroyImmediate(newInst);
+        UnityEngine.Object.DestroyImmediate(newInst);
         return prefab;
     }
 
@@ -303,7 +305,7 @@ public static class FishSetupEditor
     private static void WireWaterLoot(FishingLootData[] lootDataAssets)
     {
         // Find the FishingLoot component in the current scene (on the water object)
-        var fishingLoot = Object.FindAnyObjectByType<FishingLoot>();
+        var fishingLoot = UnityEngine.Object.FindAnyObjectByType<FishingLoot>();
         if (fishingLoot == null)
         {
             Debug.LogWarning("[FishSetup] No FishingLoot found in scene. Open GameScene first, then re-run.");
@@ -340,7 +342,7 @@ public static class FishSetupEditor
     {
         // NetworkManager lives in LobbyScene (not GameScene).
         // Try to find it in currently loaded scenes first, then load LobbyScene additively if needed.
-        var nm = Object.FindAnyObjectByType<Mirror.NetworkManager>();
+        var nm = UnityEngine.Object.FindAnyObjectByType<Mirror.NetworkManager>();
         bool loadedLobby = false;
         UnityEngine.SceneManagement.Scene lobbyScene = default;
 
@@ -351,7 +353,7 @@ public static class FishSetupEditor
                 "Assets/Scenes/LobbyScene.unity",
                 UnityEditor.SceneManagement.OpenSceneMode.Additive);
             loadedLobby = true;
-            nm = Object.FindAnyObjectByType<Mirror.NetworkManager>();
+            nm = UnityEngine.Object.FindAnyObjectByType<Mirror.NetworkManager>();
         }
 
         if (nm == null)
