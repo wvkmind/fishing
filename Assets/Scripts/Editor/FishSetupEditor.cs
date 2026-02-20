@@ -338,13 +338,31 @@ public static class FishSetupEditor
 
     private static void RegisterNetworkPrefabs(System.Collections.Generic.List<MultiplayerFishing.FishDatabase.FishEntry> entries)
     {
+        // NetworkManager lives in LobbyScene (not GameScene).
+        // Try to find it in currently loaded scenes first, then load LobbyScene additively if needed.
         var nm = Object.FindAnyObjectByType<Mirror.NetworkManager>();
+        bool loadedLobby = false;
+        UnityEngine.SceneManagement.Scene lobbyScene = default;
+
         if (nm == null)
         {
-            Debug.LogWarning("[FishSetup] No NetworkManager in scene. Fish prefabs not registered for spawning.");
+            // Load LobbyScene additively to access its NetworkManager
+            lobbyScene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                "Assets/Scenes/LobbyScene.unity",
+                UnityEditor.SceneManagement.OpenSceneMode.Additive);
+            loadedLobby = true;
+            nm = Object.FindAnyObjectByType<Mirror.NetworkManager>();
+        }
+
+        if (nm == null)
+        {
+            Debug.LogWarning("[FishSetup] No NetworkManager found. Fish prefabs not registered for spawning.");
+            if (loadedLobby)
+                UnityEditor.SceneManagement.EditorSceneManager.CloseScene(lobbyScene, true);
             return;
         }
 
+        bool changed = false;
         foreach (var entry in entries)
         {
             if (entry.networkPrefab == null) continue;
@@ -352,8 +370,30 @@ public static class FishSetupEditor
             {
                 nm.spawnPrefabs.Add(entry.networkPrefab);
                 Debug.Log($"[FishSetup] Registered spawn prefab: {entry.lootName}");
+                changed = true;
             }
         }
-        EditorUtility.SetDirty(nm);
+
+        // Also register the float prefab if not already there
+        var floatPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Multiplayer/NetworkFishingFloat.prefab");
+        if (floatPrefab != null && !nm.spawnPrefabs.Contains(floatPrefab))
+        {
+            nm.spawnPrefabs.Add(floatPrefab);
+            Debug.Log("[FishSetup] Registered spawn prefab: NetworkFishingFloat");
+            changed = true;
+        }
+
+        if (changed)
+        {
+            EditorUtility.SetDirty(nm);
+            if (loadedLobby)
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(lobbyScene);
+                Debug.Log("[FishSetup] Saved LobbyScene with updated spawnPrefabs");
+            }
+        }
+
+        if (loadedLobby)
+            UnityEditor.SceneManagement.EditorSceneManager.CloseScene(lobbyScene, true);
     }
 }

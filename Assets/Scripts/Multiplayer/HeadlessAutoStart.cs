@@ -24,9 +24,38 @@ namespace MultiplayerFishing
             if (Application.isBatchMode)
             {
                 Debug.Log("[HeadlessAutoStart] Batch mode — starting Server Only");
+                LogSpawnPrefabs(nm, "Server");
                 nm.StartServer();
             }
             // Client: no longer auto-connects. LobbyUI handles manual connect.
+        }
+
+        /// <summary>
+        /// Diagnostic: log all registered spawn prefabs and their assetIds.
+        /// Helps debug "Failed to spawn server object" errors.
+        /// </summary>
+        public static void LogSpawnPrefabs(NetworkManager nm, string label)
+        {
+            Debug.Log($"[SpawnPrefabDiag][{label}] spawnPrefabs count={nm.spawnPrefabs.Count}");
+            for (int i = 0; i < nm.spawnPrefabs.Count; i++)
+            {
+                var prefab = nm.spawnPrefabs[i];
+                if (prefab == null)
+                {
+                    Debug.Log($"[SpawnPrefabDiag][{label}]   [{i}] NULL");
+                    continue;
+                }
+                var ni = prefab.GetComponent<NetworkIdentity>();
+                uint assetId = ni != null ? ni.assetId : 0;
+                Debug.Log($"[SpawnPrefabDiag][{label}]   [{i}] {prefab.name} assetId={assetId}");
+            }
+            // Also log the player prefab
+            if (nm.playerPrefab != null)
+            {
+                var pni = nm.playerPrefab.GetComponent<NetworkIdentity>();
+                Debug.Log($"[SpawnPrefabDiag][{label}]   [player] {nm.playerPrefab.name} assetId={pni?.assetId ?? 0}");
+            }
+        }
         }
 
         private static bool OnWantsToQuit()

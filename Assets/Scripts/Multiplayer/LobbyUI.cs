@@ -105,6 +105,7 @@ namespace MultiplayerFishing
             if (nm == null) return;
 
             nm.networkAddress = HeadlessAutoStart.ServerAddress;
+            HeadlessAutoStart.LogSpawnPrefabs(nm, "Client");
             nm.StartClient();
 
             _connectBtn.interactable = false;
