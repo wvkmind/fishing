@@ -1,5 +1,7 @@
 using Mirror;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 using FishingGameTool.Example;
 
 namespace MultiplayerFishing
@@ -8,6 +10,7 @@ namespace MultiplayerFishing
     /// Configures local vs remote player component states on spawn.
     /// Local player: enables input, cameras, UI.
     /// Remote player: disables input, cameras, AudioListener; keeps Animator and renderers.
+    /// Also creates a floating name label above every player's head visible to all clients.
     /// </summary>
     [RequireComponent(typeof(NetworkIdentity))]
     public class NetworkPlayerSetup : NetworkBehaviour
@@ -20,18 +23,40 @@ namespace MultiplayerFishing
         [SerializeField] private Camera _fppCamera;
         [SerializeField] private AudioListener _audioListener;
 
+        [SyncVar(hook = nameof(OnPlayerNameChanged))]
+        public string syncPlayerName;
+
+        private GameObject _nameLabelGO;
+
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+            // Look up player name from ConnectionPlayerMap → ServerStorage
+            if (connectionToClient != null &&
+                PlayerAuthenticator.ConnectionPlayerMap.TryGetValue(connectionToClient, out string playerId))
+            {
+                var storage = PlayerAuthenticator.Storage;
+                if (storage != null)
+                {
+                    var data = storage.FindPlayer(playerId);
+                    if (data != null)
+                        syncPlayerName = data.playerName;
+                }
+            }
+        }
+
         public override void OnStartAuthority()
         {
             FindSceneCameras();
 
-            ConfigurePlayerComponents(true,
+            // 玩家创建时始终在大厅，不启用移动和相机。
+            // 进入游戏场景后由 NFC.EnterGameMode() 启用。
+            ConfigurePlayerComponents(false,
                 _characterMovement, _interactionSystem, _simpleUIManager,
                 _tppCamera, _fppCamera, _audioListener);
 
-            // Local player: CharacterController handles movement,
-            // disable CharacterController on remote players to avoid conflicts
             var cc = GetComponent<CharacterController>();
-            if (cc != null) cc.enabled = true;
+            if (cc != null) cc.enabled = false;
         }
 
         public override void OnStartClient()
@@ -48,6 +73,78 @@ namespace MultiplayerFishing
             // Remote player: disable CharacterController, NetworkTransform handles position
             var cc = GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
+        }
+
+        /// <summary>
+        /// Called on all clients after OnStartClient. Create the floating name label here
+        /// so it works for both local and remote players.
+        /// </summary>
+        private void Start()
+        {
+            if (Application.isBatchMode) return;
+            CreateNameLabel(syncPlayerName);
+        }
+
+        private void OnPlayerNameChanged(string oldName, string newName)
+        {
+            UpdateNameLabel(newName);
+        }
+
+        private void CreateNameLabel(string playerName)
+        {
+            if (_nameLabelGO != null) return;
+
+            _nameLabelGO = new GameObject("PlayerNameLabel");
+            _nameLabelGO.transform.SetParent(transform, false);
+            // Position above head (adjust Y based on character height)
+            _nameLabelGO.transform.localPosition = new Vector3(0f, 2.2f, 0f);
+
+            var canvas = _nameLabelGO.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.sortingOrder = 200;
+
+            var rt = _nameLabelGO.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(2f, 0.4f);
+            rt.localScale = new Vector3(0.01f, 0.01f, 0.01f);
+
+            var textGo = new GameObject("NameText");
+            textGo.transform.SetParent(_nameLabelGO.transform, false);
+            var textRect = textGo.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            tmp.text = string.IsNullOrEmpty(playerName) ? "" : playerName;
+            tmp.fontSize = 28;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.white;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        private void UpdateNameLabel(string playerName)
+        {
+            if (_nameLabelGO == null)
+            {
+                CreateNameLabel(playerName);
+                return;
+            }
+            var tmp = _nameLabelGO.GetComponentInChildren<TextMeshProUGUI>();
+            if (tmp != null)
+                tmp.text = string.IsNullOrEmpty(playerName) ? "" : playerName;
+        }
+
+        /// <summary>
+        /// Billboard: make name label always face the camera.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (_nameLabelGO == null || Application.isBatchMode) return;
+            var cam = Camera.main;
+            if (cam == null) return;
+            _nameLabelGO.transform.rotation = cam.transform.rotation;
         }
 
         /// <summary>

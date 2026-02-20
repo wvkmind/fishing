@@ -58,7 +58,7 @@ namespace MultiplayerFishing
 
         private bool _initialized;
 
-        public bool IsMenuOpen => _escMenuVisible;
+        public bool IsMenuOpen => _escMenuVisible || _inventoryVisible;
 
         public void Initialize(NetworkFishingController controller, float maxCastForce, float maxLineLoad, float overLoadDuration)
         {
@@ -253,6 +253,11 @@ namespace MultiplayerFishing
                 {
                     var go = new GameObject("InventoryUI");
                     _inventoryUI = go.AddComponent<InventoryUI>();
+                    _inventoryUI.OnClosed = () =>
+                    {
+                        _inventoryVisible = false;
+                        SetInputBlocked(false);
+                    };
                 }
                 var playerData = PlayerAuthenticator.LocalPlayerData;
                 if (playerData != null)
@@ -512,13 +517,22 @@ namespace MultiplayerFishing
             _escMenuRoot.SetActive(false);
             SetInputBlocked(false);
 
-            // Disconnect from server → Mirror returns to offlineScene (LobbyScene)
-            if (NetworkClient.active)
+            // ReturnToLobby 不断开连接，只卸载地图场景回到大厅 UI
+            var lobbyUI = FindAnyObjectByType<LobbyUI>();
+            if (lobbyUI != null)
             {
-                if (NetworkServer.active)
-                    NetworkManager.singleton.StopHost();
-                else
-                    NetworkManager.singleton.StopClient();
+                lobbyUI.ReturnToLobby();
+            }
+            else
+            {
+                // Fallback: 找不到 LobbyUI，直接断开
+                if (NetworkClient.active)
+                {
+                    if (NetworkServer.active)
+                        NetworkManager.singleton.StopHost();
+                    else
+                        NetworkManager.singleton.StopClient();
+                }
             }
         }
 

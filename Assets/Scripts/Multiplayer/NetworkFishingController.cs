@@ -147,52 +147,48 @@ namespace MultiplayerFishing
 
             if (isOwned)
             {
-                // Only initialize FishingUI in GameScene, not in LobbyScene
-                var activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-                bool isGameScene = activeScene.name.Contains("GameScene");
+                // 玩家对象创建时始终在大厅模式（LobbyScene）。
+                // 进入游戏场景后由 LobbyUI 调用 EnterGameMode()。
+                // Lobby mode: disable all player interaction, hide model
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
+                if (charMove != null) charMove.enabled = false;
+                var rb = GetComponent<Rigidbody>();
+                if (rb != null) rb.isKinematic = true;
+                var cc = GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
 
-                if (isGameScene)
-                {
-                    var fishingUI = GetComponentInChildren<FishingUI>(true);
-                    if (fishingUI != null)
-                    {
-                        fishingUI.Initialize(
-                            this,
-                            _fishingSystem._maxCastForce,
-                            _fishingSystem._fishingRod._lineStatus._maxLineLoad,
-                            _fishingSystem._fishingRod._lineStatus._overLoadDuration);
-                        _fishingUI = fishingUI;
-                    }
-                }
-                else
-                {
-                    // In lobby: unlock cursor, disable character movement & physics
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                    var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
-                    if (charMove != null) charMove.enabled = false;
-                    var rb = GetComponent<Rigidbody>();
-                    if (rb != null) { rb.isKinematic = true; }
-                    var cc = GetComponent<CharacterController>();
-                    if (cc != null) cc.enabled = false;
-                    // Place player at safe position
-                    transform.position = new Vector3(0f, 1f, 0f);
+                var tpp = GetComponentInChildren<FishingGameTool.Example.TPPCamera>(true);
+                if (tpp != null) tpp.enabled = false;
+                var fpp = GetComponentInChildren<FishingGameTool.Example.FPPCameraSystem>(true);
+                if (fpp != null) fpp.enabled = false;
 
-                    // Listen for scene change to re-initialize when entering GameScene
-                    UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoadedForInit;
-                }
+                // Hide player model
+                foreach (var r in GetComponentsInChildren<Renderer>(true))
+                    r.enabled = false;
+
+                transform.position = new Vector3(0f, 1f, 0f);
+            }
+            else
+            {
+                // Remote player: hide in lobby
+                foreach (var r in GetComponentsInChildren<Renderer>(true))
+                    r.enabled = false;
             }
         }
 
-        private void OnSceneLoadedForInit(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        /// <summary>
+        /// 从大厅模式切换到游戏模式：启用移动、相机、FishingUI，显示玩家模型。
+        /// 由 LobbyUI 在场景加载完成后调用。
+        /// </summary>
+        public void EnterGameMode()
         {
-            if (!isOwned || _fishingSystem == null) return;
-            if (!scene.name.Contains("GameScene")) return;
+            if (_fishingSystem == null) return;
 
-            // Unsubscribe — only need this once
-            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoadedForInit;
+            Debug.Log($"[NFC] EnterGameMode netId={netId}");
 
-            // Re-enable character movement & physics
+            // Enable character movement & physics
             var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
             if (charMove != null) charMove.enabled = true;
             var rb = GetComponent<Rigidbody>();
@@ -200,7 +196,42 @@ namespace MultiplayerFishing
             var cc = GetComponent<CharacterController>();
             if (cc != null) cc.enabled = true;
 
-            // Initialize FishingUI now
+            // Enable camera control scripts
+            var tpp = GetComponentInChildren<FishingGameTool.Example.TPPCamera>(true);
+            if (tpp != null) tpp.enabled = true;
+            var fpp = GetComponentInChildren<FishingGameTool.Example.FPPCameraSystem>(true);
+            if (fpp != null) fpp.enabled = true;
+
+            // Enable Camera components (NetworkPlayerSetup disables them in lobby mode)
+            if (tpp != null)
+            {
+                var tppCam = tpp.GetComponent<Camera>();
+                if (tppCam != null) tppCam.enabled = true;
+            }
+            if (fpp != null)
+            {
+                var fppCam = fpp.GetComponent<Camera>();
+                if (fppCam != null) fppCam.enabled = true;
+            }
+
+            // Enable AudioListener on local player
+            var audioListener = GetComponentInChildren<AudioListener>(true);
+            if (audioListener != null) audioListener.enabled = true;
+
+            // Enable InteractionSystem (disabled by NetworkPlayerSetup)
+            var interaction = GetComponent<FishingGameTool.Example.InteractionSystem>();
+            if (interaction != null) interaction.enabled = true;
+
+            // Restore rod & HandIK visuals based on current equip state
+            ApplyRodVisuals(syncRodEquipped);
+
+            // Re-enable all renderers (LineRenderer inherits Renderer)
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                r.enabled = true;
+
+            Debug.Log($"[NFC] EnterGameMode cameras: TPP={tpp != null}(enabled={tpp?.enabled}), FPP={fpp != null}(enabled={fpp?.enabled}), pos={transform.position}, rodEquipped={syncRodEquipped}");
+
+            // Initialize FishingUI
             var fishingUI = GetComponentInChildren<FishingUI>(true);
             if (fishingUI != null && _fishingUI == null)
             {
@@ -211,6 +242,66 @@ namespace MultiplayerFishing
                     _fishingSystem._fishingRod._lineStatus._overLoadDuration);
                 _fishingUI = fishingUI;
             }
+
+            // Lock cursor for game mode
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+        /// <summary>
+        /// 退出游戏模式，回到大厅状态。禁用所有游戏组件，隐藏模型。
+        /// 由 LobbyUI.ReturnToLobby 调用（不断开连接）。
+        /// </summary>
+        public void ExitGameMode()
+        {
+            Debug.Log($"[NFC] ExitGameMode netId={netId}");
+
+            // Disable character movement & physics
+            var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
+            if (charMove != null) charMove.enabled = false;
+            var rb = GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = true;
+            var cc = GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+
+            // Disable camera control scripts
+            var tpp = GetComponentInChildren<FishingGameTool.Example.TPPCamera>(true);
+            if (tpp != null) tpp.enabled = false;
+            var fpp = GetComponentInChildren<FishingGameTool.Example.FPPCameraSystem>(true);
+            if (fpp != null) fpp.enabled = false;
+
+            // Disable Camera components
+            if (tpp != null)
+            {
+                var tppCam = tpp.GetComponent<Camera>();
+                if (tppCam != null) tppCam.enabled = false;
+            }
+            if (fpp != null)
+            {
+                var fppCam = fpp.GetComponent<Camera>();
+                if (fppCam != null) fppCam.enabled = false;
+            }
+
+            // Disable AudioListener
+            var audioListener = GetComponentInChildren<AudioListener>(true);
+            if (audioListener != null) audioListener.enabled = false;
+
+            // Disable InteractionSystem
+            var interaction = GetComponent<FishingGameTool.Example.InteractionSystem>();
+            if (interaction != null) interaction.enabled = false;
+
+            // Hide player model & all renderers
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                r.enabled = false;
+
+            // Unlock cursor for lobby
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            // Hide FishingUI
+            var fishingUI = GetComponentInChildren<FishingUI>(true);
+            if (fishingUI != null)
+                fishingUI.gameObject.SetActive(false);
         }
 
         private void Update()
@@ -313,6 +404,14 @@ namespace MultiplayerFishing
         {
             _presenter.Apply(syncState, syncAttractInput, ActiveFloatTransform);
 
+            // Debug: log once when float appears/disappears
+            if (isOwned && ActiveFloatTransform != null && syncState == FishingState.Floating)
+            {
+                var rod = _fishingSystem?._fishingRod;
+                var lr = rod != null ? rod.GetComponent<LineRenderer>() : null;
+                Debug.Log($"[NFC] ClientPresent: float={ActiveFloatTransform != null}, rod._fishingFloat={rod?._fishingFloat != null}, rodGO.active={rod?.gameObject.activeSelf}, LR.enabled={lr?.enabled}, rodEnabled={rod?.enabled}, handIK={_handIK?.enabled}");
+            }
+
             if (isOwned && _fishingUI != null)
                 _fishingUI.UpdateUI(_isCharging, _currentCastForce);
         }
@@ -323,12 +422,13 @@ namespace MultiplayerFishing
 
         private void HandleLocalInput()
         {
-            if (_fishingSystem == null) return;
+            if (_fishingSystem == null) { Debug.LogWarning("[NFC] HandleLocalInput: _fishingSystem is null"); return; }
             if (_fishingUI != null && _fishingUI.IsMenuOpen) return;
 
             // ── Rod equip toggle (F key) — works in any state ──
             if (Input.GetKeyDown(KeyCode.F))
             {
+                Debug.Log($"[NFC] F pressed: syncState={syncState}, rodEquipped={syncRodEquipped}");
                 if (syncState == FishingState.Idle || syncState == FishingState.Displaying)
                 {
                     CmdToggleRod();
@@ -416,6 +516,10 @@ namespace MultiplayerFishing
 
             Vector3 spawnPoint = _fishingSystem._fishingRod._line._lineAttachment.position;
             _spawnedFloat = Instantiate(_networkFloatPrefab, spawnPoint, Quaternion.identity);
+
+            // 把 float 移到玩家所在的场景（否则 SceneInterestManagement 会隔离它）
+            if (_spawnedFloat.scene != gameObject.scene)
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(_spawnedFloat, gameObject.scene);
 
             var rb = _spawnedFloat.GetComponent<Rigidbody>();
             if (rb != null)
@@ -669,6 +773,10 @@ namespace MultiplayerFishing
 
             // Spawn at player position (will be re-parented to hand on clients)
             _serverDroppedFish = Instantiate(prefab, transform.position, Quaternion.identity);
+
+            // 把鱼移到玩家所在的场景
+            if (_serverDroppedFish.scene != gameObject.scene)
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(_serverDroppedFish, gameObject.scene);
 
             // Remove physics — fish is held, not dropped
             var rb = _serverDroppedFish.GetComponent<Rigidbody>();

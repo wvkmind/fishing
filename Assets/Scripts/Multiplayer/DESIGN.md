@@ -485,3 +485,101 @@ FishingGameTool 插件已有 `FishingBaitData` 数据结构（BaitTier: Uncommon
 - 装备鱼饵的 UI 和网络逻辑（`CmdSetBait` → `FishingStateMachine.SetBait()`）
 - 恢复 `ChooseLoot` 中的 baitTier 过滤逻辑
 - 不同鱼饵影响咬钩概率（`RollCatchCheck` 中已有对应逻辑）
+
+
+## 十五、多场景管理系统 (Additive Scene Management)
+
+### 架构概述
+
+服务器始终保持 LobbyScene 作为基础场景运行。游戏地图以 `LoadSceneMode.Additive` 方式动态加载，多个地图可同时运行。玩家通过 `SceneManager.MoveGameObjectToScene` 在场景间移动。配合 Mirror 的 `SceneInterestManagement` 组件实现跨场景玩家隔离（不同场景的玩家互相不可见）。
+
+```
+LobbyScene (基础场景，始终运行)
+  ├── NetworkManager + SceneInterestManagement
+  ├── AdditiveSceneManager
+  └── 玩家认证后停留在此，选地图后移入游戏场景
+
+GameScene (Additive，按需加载)
+  ├── 地形、水面、光照、鱼群
+  └── 进入的玩家 GameObject
+
+FutureMap1 (Additive，按需加载)
+  └── ...
+```
+
+### 核心组件
+
+| 组件 | 位置 | 职责 |
+|------|------|------|
+| `AdditiveSceneManager` | NetworkManager GameObject | 服务器端场景生命周期管理、玩家移动 |
+| `SceneInterestManagement` | NetworkManager GameObject | Mirror 内置，按场景隔离网络对象可见性 |
+| `LobbyUI` | LobbyScene | 客户端大厅 UI，发送 `EnterSceneMessage` |
+| `NetworkFishingController.EnterGameMode()` | 玩家 Prefab | 从大厅模式切换到游戏模式 |
+
+### 消息流
+
+```
+[客户端选地图] → EnterSceneMessage → [服务器 AdditiveSceneManager]
+                                        ├── 场景未加载？LoadSceneAsync(Additive)
+                                        ├── MoveGameObjectToScene(玩家, 目标场景)
+                                        └── 发送 LoadSceneMessage → [客户端]
+                                                                      ├── LoadSceneAsync(Additive)
+                                                                      ├── MoveGameObjectToScene(本地玩家)
+                                                                      └── NFC.EnterGameMode()
+```
+
+### 场景生命周期
+
+- 第一个玩家请求进入时加载
+- 最后一个玩家离开后等待 30 秒，仍无人则卸载
+- 同一场景可被多个玩家共享
+
+### 玩家状态流转
+
+```
+连接 → 认证 → LobbyScene (隐藏模型, 无输入)
+  → 选地图 → 移入 GameScene (显示模型, 启用输入, FishingUI)
+  → ESC→Lobby → 断开连接 → 重新连接 → LobbyScene
+```
+
+---
+
+## 十六、如何添加新地图
+
+### 步骤
+
+#### 1. 创建场景
+
+在 Unity Editor 中创建新场景（如 `OceanMap`），放入地形、水面、光照等。
+
+场景中的水面物体需要挂 `WaterZone` 组件和 `FishingLoot` 组件（配置可钓鱼种），与 GameScene 相同。
+
+#### 2. 添加到 Build Settings
+
+`File → Build Settings → Add Open Scenes`，确保新场景在列表中。顺序无所谓，Additive 加载不依赖 index。
+
+#### 3. 注册地图到 LobbyUI
+
+打开 `Assets/Scripts/Multiplayer/LobbyUI.cs`，找到 `AvailableMaps` 数组，添加一条：
+
+```csharp
+private static readonly MapEntry[] AvailableMaps = new MapEntry[]
+{
+    new MapEntry { mapName = "Inland Lake", sceneName = "GameScene" },
+    new MapEntry { mapName = "Ocean",       sceneName = "OceanMap" },  // ← 新增
+};
+```
+
+- `mapName`：大厅 UI 显示的地图名称
+- `sceneName`：Unity 场景文件名（不含 .unity 后缀）
+
+#### 4. 完成
+
+不需要改其他代码。`AdditiveSceneManager` 会在第一个玩家请求时自动加载场景，最后一个玩家离开后自动卸载。`SceneInterestManagement` 自动隔离不同场景的玩家。
+
+### 注意事项
+
+- 新场景不要包含 NetworkManager、EventSystem 等全局对象（这些在 LobbyScene 中）
+- 新场景中的 NetworkIdentity 对象（如可交互物体）会被 `SceneInterestManagement` 自动管理
+- 如果新场景有特殊的鱼种配置，在场景水面的 `FishingLoot` 组件中配置即可
+- 确保 NetworkManager 的 `spawnPrefabs` 列表包含新场景中用到的所有网络 prefab

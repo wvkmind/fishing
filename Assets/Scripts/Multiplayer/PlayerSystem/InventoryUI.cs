@@ -33,6 +33,11 @@ public class InventoryUI : MonoBehaviour
     public bool IsInspecting => _isInspecting;
 
     /// <summary>
+    /// 背包被关闭时触发（关闭按钮或外部调用 Hide）。
+    /// </summary>
+    public System.Action OnClosed;
+
+    /// <summary>
     /// 打开背包面板，传入当前背包数据和 ItemRegistry 引用。
     /// </summary>
     public void Show(Inventory inventory, ItemRegistry registry)
@@ -331,6 +336,7 @@ public class InventoryUI : MonoBehaviour
     private void OnCloseClicked()
     {
         Hide();
+        OnClosed?.Invoke();
     }
 
     private void OnCardClicked(GameObject card, string logicId)
