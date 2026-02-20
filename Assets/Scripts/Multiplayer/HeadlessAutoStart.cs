@@ -56,7 +56,7 @@ namespace MultiplayerFishing
                 Debug.Log($"[SpawnPrefabDiag][{label}]   [player] {nm.playerPrefab.name} assetId={pni?.assetId ?? 0}");
             }
         }
-        }
+        
 
         private static bool OnWantsToQuit()
         {
