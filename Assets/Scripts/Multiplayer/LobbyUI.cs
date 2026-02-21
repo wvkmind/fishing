@@ -657,7 +657,7 @@ namespace MultiplayerFishing
 
         private void BuildAuthenticatedPanel()
         {
-            _authPanel = CreatePanel(_canvas.transform, new Vector2(400f, 320f));
+            _authPanel = CreatePanel(_canvas.transform, new Vector2(400f, 380f));
 
             _playerNameText = CreateText(_authPanel.transform, "", 28,
                 new Vector2(0f, 110f), new Vector2(360f, 40f));
