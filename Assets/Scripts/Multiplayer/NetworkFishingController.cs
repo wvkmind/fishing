@@ -250,24 +250,6 @@ namespace MultiplayerFishing
             // Lock cursor for game mode
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
-
-            // 同步本场景所有远程玩家：移到正确场景 + 开启 Renderer
-            var currentScene = gameObject.scene;
-            foreach (var kvp in NetworkClient.spawned)
-            {
-                var ni = kvp.Value;
-                if (ni == null || ni.isOwned) continue;
-                var remoteNfc = ni.GetComponent<NetworkFishingController>();
-                if (remoteNfc == null || !remoteNfc.syncInGame) continue;
-
-                if (ni.gameObject.scene != currentScene)
-                    UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(ni.gameObject, currentScene);
-
-                foreach (var r in ni.GetComponentsInChildren<Renderer>(true))
-                    r.enabled = true;
-
-                Debug.Log($"[NFC] Synced remote player {ni.netId} into scene '{currentScene.name}'");
-            }
         }
 
         /// <summary>

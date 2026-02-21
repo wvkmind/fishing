@@ -197,6 +197,9 @@ namespace MultiplayerFishing
 
         /// <summary>
         /// 将玩家的 NetworkIdentity 移动到目标场景。
+        /// 参考 Mirror 官方 MultipleAdditiveScenes 示例：
+        /// 先发 SceneMessage 让客户端加载场景，等一帧后再移动玩家并 RebuildObservers，
+        /// 确保 spawn 消息到达客户端时场景已经在加载中。
         /// </summary>
         private void MovePlayerToScene(NetworkConnectionToClient conn, string sceneName)
         {
@@ -213,10 +216,25 @@ namespace MultiplayerFishing
                 return;
             }
 
-            // 先移动玩家 GameObject 到目标场景（服务器端先完成移动）
+            StartCoroutine(CoMovePlayerToScene(conn, playerIdentity, sceneInstance, sceneName));
+        }
+
+        private IEnumerator CoMovePlayerToScene(NetworkConnectionToClient conn,
+            NetworkIdentity playerIdentity, SceneInstance sceneInstance, string sceneName)
+        {
+            // 1. 用 Mirror 内置 SceneMessage 通知客户端加载场景（触发 Mirror 的场景管理流程）
+            conn.Send(new SceneMessage { sceneName = sceneName, sceneOperation = SceneOperation.LoadAdditive });
+
+            // 2. 等一帧，确保 SceneMessage 先于后续 spawn 消息到达客户端
+            //    （与 Mirror 官方 MultipleAdditiveScenes 示例一致）
+            yield return new WaitForEndOfFrame();
+
+            if (playerIdentity == null) yield break;
+
+            // 3. 服务器端移动玩家到目标场景
             SceneManager.MoveGameObjectToScene(playerIdentity.gameObject, sceneInstance.scene);
 
-            // 将玩家传送到目标场景的出生点
+            // 传送到出生点
             var spawnPos = FindSpawnInScene(sceneInstance.scene);
             var cc = playerIdentity.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
@@ -224,7 +242,7 @@ namespace MultiplayerFishing
             if (cc != null) cc.enabled = true;
             Debug.Log($"[AdditiveSceneManager] Teleported player to {spawnPos} in '{sceneName}'");
 
-            // 同时移动玩家拥有的其他对象（如钓鱼浮标、鱼等）
+            // 移动玩家拥有的其他对象
             foreach (var owned in conn.owned)
             {
                 if (owned != null && owned.gameObject.scene != sceneInstance.scene)
@@ -235,10 +253,10 @@ namespace MultiplayerFishing
             sceneInstance.players.Add(conn);
             _playerSceneMap[conn] = sceneName;
 
-            // 重建 observers 让 SceneInterestManagement 生效
+            // 4. RebuildObservers — SceneInterestManagement 会让同场景玩家互相可见
             NetworkServer.RebuildObservers(playerIdentity, false);
 
-            // 最后通知客户端加载场景（服务器端移动已完成）
+            // 同时也通知客户端加载自定义消息（LobbyUI 用来做 UI 切换和 loading screen）
             conn.Send(new LoadSceneMessage { sceneName = sceneName });
 
             Debug.Log($"[AdditiveSceneManager] Player {conn} moved to '{sceneName}', " +

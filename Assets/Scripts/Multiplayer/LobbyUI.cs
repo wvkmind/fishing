@@ -196,22 +196,31 @@ namespace MultiplayerFishing
             SetState(ClientState.Loading);
             ShowLoading("Loading map...");
 
-            // 1. 加载场景
+            // Mirror 的 SceneMessage 已经触发了场景加载，这里等待它完成即可
             var existing = SceneManager.GetSceneByName(sceneName);
             if (!existing.IsValid() || !existing.isLoaded)
             {
+                // 场景可能正在被 Mirror 加载，也可能还没开始，尝试加载
                 var op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
-                if (op == null)
+                if (op != null)
                 {
-                    Debug.LogError($"[LobbyUI] Failed to load scene '{sceneName}'");
-                    SetState(ClientState.Lobby);
-                    yield break;
+                    while (!op.isDone)
+                    {
+                        UpdateLoading(Mathf.Clamp01(op.progress / 0.9f) * 0.7f,
+                            $"Loading map... {(int)(op.progress / 0.9f * 70)}%");
+                        yield return null;
+                    }
                 }
-                while (!op.isDone)
+                else
                 {
-                    UpdateLoading(Mathf.Clamp01(op.progress / 0.9f) * 0.7f,
-                        $"Loading map... {(int)(op.progress / 0.9f * 70)}%");
-                    yield return null;
+                    // op == null 说明 Mirror 已经在加载了，等它完成
+                    while (true)
+                    {
+                        var s = SceneManager.GetSceneByName(sceneName);
+                        if (s.IsValid() && s.isLoaded) break;
+                        UpdateLoading(0.5f, "Waiting for scene...");
+                        yield return null;
+                    }
                 }
             }
 
