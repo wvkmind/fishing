@@ -38,6 +38,8 @@ namespace MultiplayerFishing
         [SyncVar] public string syncLootDescription;
         [SyncVar] public float syncLootWeight;
         [SyncVar(hook = nameof(OnRodEquippedChanged))] public bool syncRodEquipped;
+        [SyncVar(hook = nameof(OnInGameChanged))] public bool syncInGame;
+        [SyncVar(hook = nameof(OnInGameChanged))] public bool syncInGame;
 
         // ── Public accessor for other components (e.g. NetworkFishingRod) ──
         public Transform ActiveFloatTransform { get; private set; }
@@ -172,9 +174,9 @@ namespace MultiplayerFishing
             }
             else
             {
-                // Remote player: hide in lobby
+                // Remote player: show/hide based on their current inGame state
                 foreach (var r in GetComponentsInChildren<Renderer>(true))
-                    r.enabled = false;
+                    r.enabled = syncInGame;
             }
         }
 
@@ -187,6 +189,9 @@ namespace MultiplayerFishing
             if (_fishingSystem == null) return;
 
             Debug.Log($"[NFC] EnterGameMode netId={netId}");
+
+            // Notify server (and all clients via SyncVar) that we're in game
+            CmdSetInGame(true);
 
             // Enable character movement & physics
             var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
@@ -255,6 +260,9 @@ namespace MultiplayerFishing
         public void ExitGameMode()
         {
             Debug.Log($"[NFC] ExitGameMode netId={netId}");
+
+            // Notify server (and all clients via SyncVar) that we left game
+            CmdSetInGame(false);
 
             // Disable character movement & physics
             var charMove = GetComponent<FishingGameTool.Example.CharacterMovement>();
@@ -899,6 +907,27 @@ namespace MultiplayerFishing
 
             if (_handIK != null)
                 _handIK.enabled = equipped;
+        }
+
+        // ── InGame sync ──────────────────────────────────────────────
+
+        [Command]
+        private void CmdSetInGame(bool value)
+        {
+            syncInGame = value;
+        }
+
+        /// <summary>
+        /// SyncVar hook: when a remote player's inGame state changes,
+        /// show/hide their renderers accordingly.
+        /// </summary>
+        private void OnInGameChanged(bool oldVal, bool newVal)
+        {
+            if (isOwned) return; // local player manages its own renderers
+            if (Application.isBatchMode) return;
+
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                r.enabled = newVal;
         }
     }
 }
