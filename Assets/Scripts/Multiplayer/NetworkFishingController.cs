@@ -39,7 +39,6 @@ namespace MultiplayerFishing
         [SyncVar] public float syncLootWeight;
         [SyncVar(hook = nameof(OnRodEquippedChanged))] public bool syncRodEquipped;
         [SyncVar(hook = nameof(OnInGameChanged))] public bool syncInGame;
-        [SyncVar(hook = nameof(OnInGameChanged))] public bool syncInGame;
 
         // ── Public accessor for other components (e.g. NetworkFishingRod) ──
         public Transform ActiveFloatTransform { get; private set; }
