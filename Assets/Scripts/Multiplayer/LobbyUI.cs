@@ -161,7 +161,6 @@ namespace MultiplayerFishing
                 NetworkClient.RegisterHandler<AdditiveSceneManager.UnloadSceneMessage>(OnServerTellUnloadScene);
                 _clientHandlersRegistered = true;
             }
-
             _selectedMapIndex = 0;
             if (_authPanel == null) BuildAuthenticatedPanel();
             UpdateAuthPanelPlayerName();
@@ -196,11 +195,10 @@ namespace MultiplayerFishing
             SetState(ClientState.Loading);
             ShowLoading("Loading map...");
 
-            // Mirror 的 SceneMessage 已经触发了场景加载，这里等待它完成即可
+            // 1. 加载场景（可能已被 Mirror SceneMessage 触发加载）
             var existing = SceneManager.GetSceneByName(sceneName);
             if (!existing.IsValid() || !existing.isLoaded)
             {
-                // 场景可能正在被 Mirror 加载，也可能还没开始，尝试加载
                 var op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
                 if (op != null)
                 {
@@ -213,7 +211,7 @@ namespace MultiplayerFishing
                 }
                 else
                 {
-                    // op == null 说明 Mirror 已经在加载了，等它完成
+                    // 可能 Mirror 已经在加载了，等它完成
                     while (true)
                     {
                         var s = SceneManager.GetSceneByName(sceneName);
@@ -289,6 +287,10 @@ namespace MultiplayerFishing
                 var nfc = enterPlayer.GetComponent<NetworkFishingController>();
                 if (nfc != null) nfc.EnterGameMode();
             }
+
+            // 通知服务器场景加载完成，服务器收到后才 RebuildObservers 同步其他玩家
+            NetworkClient.Send(new AdditiveSceneManager.SceneReadyMessage { sceneName = sceneName });
+            Debug.Log($"[LobbyUI] Sent SceneReadyMessage for '{sceneName}'");
         }
 
         // ── 卸载地图（回大厅）────────────────────────────────────────

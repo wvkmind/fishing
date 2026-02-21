@@ -8,58 +8,58 @@ namespace MultiplayerFishing
 {
     /// <summary>
     /// 服务器端 Additive Scene Manager。
-    /// 管理多个游戏场景的动态加载/卸载，以及玩家在场景间的移动。
-    /// 服务器始终保持 LobbyScene 作为基础场景，游戏地图以 Additive 方式加载。
-    /// 配合 SceneInterestManagement 实现跨场景玩家隔离。
+    /// 玩家连接后在 LobbyScene，选择地图后进入对应游戏场景。
+    /// 同场景玩家互相同步，不同场景互不影响。
+    /// 配合 SceneInterestManagement 实现跨场景隔离。
+    ///
+    /// 关键时序（参考 Mirror 官方 MultipleAdditiveScenes 示例）：
+    /// 1. 客户端发 EnterSceneMessage
+    /// 2. 服务器加载场景（如果未加载），移动玩家 GameObject 到目标场景
+    /// 3. 服务器发 LoadSceneMessage 给客户端
+    /// 4. 客户端加载场景完成后发 SceneReadyMessage 回服务器
+    /// 5. 服务器收到确认后 RebuildObservers → 触发 spawn 同步
+    /// 这样保证客户端收到其他玩家的 spawn 消息时，场景已经加载好了。
     /// </summary>
     public class AdditiveSceneManager : MonoBehaviour
     {
-        /// <summary>
-        /// 单例引用，供其他组件访问。
-        /// </summary>
         public static AdditiveSceneManager Instance { get; private set; }
 
-        /// <summary>
-        /// 已加载的游戏场景及其玩家列表。
-        /// Key = sceneName, Value = (Scene handle, 玩家连接集合)
-        /// </summary>
         private readonly Dictionary<string, SceneInstance> _loadedScenes
             = new Dictionary<string, SceneInstance>();
 
-        /// <summary>
-        /// 玩家当前所在的场景名。Key = NetworkConnection
-        /// </summary>
         private readonly Dictionary<NetworkConnection, string> _playerSceneMap
             = new Dictionary<NetworkConnection, string>();
 
-        /// <summary>
-        /// 客户端请求进入场景的网络消息。
-        /// </summary>
+        // ── 网络消息 ──
+
+        /// <summary>客户端 → 服务器：请求进入场景</summary>
         public struct EnterSceneMessage : NetworkMessage
         {
             public string sceneName;
         }
 
-        /// <summary>
-        /// 服务器通知客户端加载场景的网络消息。
-        /// </summary>
+        /// <summary>服务器 → 客户端：加载场景</summary>
         public struct LoadSceneMessage : NetworkMessage
         {
             public string sceneName;
         }
 
-        /// <summary>
-        /// 服务器通知客户端卸载场景的网络消息。
-        /// </summary>
+        /// <summary>服务器 → 客户端：卸载场景</summary>
         public struct UnloadSceneMessage : NetworkMessage
         {
             public string sceneName;
         }
 
-        /// <summary>
-        /// 客户端请求离开当前场景（回大厅），不断开连接。
-        /// </summary>
+        /// <summary>客户端 → 服务器：请求离开场景回大厅</summary>
         public struct LeaveSceneMessage : NetworkMessage { }
+
+        /// <summary>客户端 → 服务器：场景加载完成确认</summary>
+        public struct SceneReadyMessage : NetworkMessage
+        {
+            public string sceneName;
+        }
+
+        // ── 生命周期 ──
 
         private void Awake()
         {
@@ -71,76 +71,52 @@ namespace MultiplayerFishing
             Instance = this;
         }
 
-        /// <summary>
-        /// 服务器启动时注册消息处理器。由 HeadlessAutoStart 调用。
-        /// </summary>
         public void ServerSetup()
         {
             NetworkServer.RegisterHandler<EnterSceneMessage>(OnEnterSceneRequest);
             NetworkServer.RegisterHandler<LeaveSceneMessage>(OnLeaveSceneRequest);
-            Debug.Log("[AdditiveSceneManager] Server setup complete, handler registered");
+            NetworkServer.RegisterHandler<SceneReadyMessage>(OnSceneReady);
+            Debug.Log("[ASM] Server setup complete");
         }
 
-        /// <summary>
-        /// 处理客户端的进入场景请求。
-        /// 如果场景未加载则先加载，然后将玩家移入。
-        /// </summary>
+        // ── 服务器消息处理 ──
+
         private void OnEnterSceneRequest(NetworkConnectionToClient conn, EnterSceneMessage msg)
         {
-            if (!conn.isAuthenticated)
-            {
-                Debug.LogWarning($"[AdditiveSceneManager] Unauthenticated request from {conn}, ignoring");
-                return;
-            }
+            if (!conn.isAuthenticated) return;
 
             string sceneName = msg.sceneName;
-            Debug.Log($"[AdditiveSceneManager] Player {conn} requesting scene '{sceneName}'");
+            Debug.Log($"[ASM] Player {conn} requesting '{sceneName}'");
 
-            // 如果玩家已在目标场景，忽略
-            if (_playerSceneMap.TryGetValue(conn, out string currentScene) && currentScene == sceneName)
-            {
-                Debug.Log($"[AdditiveSceneManager] Player already in '{sceneName}', ignoring");
+            if (_playerSceneMap.TryGetValue(conn, out string current) && current == sceneName)
                 return;
-            }
 
-            // 先从当前场景移出（如果有的话）
-            if (!string.IsNullOrEmpty(currentScene))
-                RemovePlayerFromScene(conn, currentScene);
+            if (!string.IsNullOrEmpty(current))
+                RemovePlayerFromScene(conn, current);
 
-            // 加载目标场景（如果未加载）并移入玩家
             if (_loadedScenes.ContainsKey(sceneName))
-            {
                 MovePlayerToScene(conn, sceneName);
-            }
             else
-            {
                 StartCoroutine(LoadSceneAndMovePlayer(conn, sceneName));
-            }
         }
 
-        /// <summary>
-        /// 处理客户端的离开场景请求（回大厅）。
-        /// 将玩家从当前地图场景移回 LobbyScene，不断开连接。
-        /// </summary>
         private void OnLeaveSceneRequest(NetworkConnectionToClient conn, LeaveSceneMessage msg)
         {
             if (!conn.isAuthenticated) return;
 
             if (_playerSceneMap.TryGetValue(conn, out string currentScene))
             {
-                Debug.Log($"[AdditiveSceneManager] Player {conn} leaving '{currentScene}' → lobby");
+                Debug.Log($"[ASM] Player {conn} leaving '{currentScene}' → lobby");
                 RemovePlayerFromScene(conn, currentScene);
 
-                // 将玩家移回 LobbyScene
                 var lobbyScene = SceneManager.GetSceneByName("LobbyScene");
                 if (lobbyScene.IsValid() && conn.identity != null)
                 {
                     SceneManager.MoveGameObjectToScene(conn.identity.gameObject, lobbyScene);
                     foreach (var owned in conn.owned)
-                    {
                         if (owned != null && owned.gameObject.scene != lobbyScene)
                             SceneManager.MoveGameObjectToScene(owned.gameObject, lobbyScene);
-                    }
+
                     NetworkServer.RebuildObservers(conn.identity, false);
                 }
 
@@ -149,16 +125,39 @@ namespace MultiplayerFishing
         }
 
         /// <summary>
-        /// 异步加载场景（Additive），然后将玩家移入。
+        /// 客户端场景加载完成后的确认。此时才 RebuildObservers，
+        /// 保证 spawn 消息到达时客户端场景已就绪。
         /// </summary>
+        private void OnSceneReady(NetworkConnectionToClient conn, SceneReadyMessage msg)
+        {
+            if (conn.identity == null) return;
+
+            Debug.Log($"[ASM] Player {conn} scene ready: '{msg.sceneName}'");
+
+            // RebuildObservers 让 SceneInterestManagement 把同场景的玩家互相加入 observer
+            NetworkServer.RebuildObservers(conn.identity, false);
+
+            // 也 rebuild 同场景其他玩家，让他们能看到新来的人
+            if (_loadedScenes.TryGetValue(msg.sceneName, out var si))
+            {
+                foreach (var other in si.players)
+                {
+                    if (other != conn && other.identity != null)
+                        NetworkServer.RebuildObservers(other.identity, false);
+                }
+            }
+        }
+
+        // ── 场景加载与玩家移动 ──
+
         private IEnumerator LoadSceneAndMovePlayer(NetworkConnectionToClient conn, string sceneName)
         {
-            Debug.Log($"[AdditiveSceneManager] Loading scene '{sceneName}' additively...");
+            Debug.Log($"[ASM] Loading scene '{sceneName}' additively...");
 
             var asyncOp = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
             if (asyncOp == null)
             {
-                Debug.LogError($"[AdditiveSceneManager] Failed to load scene '{sceneName}'");
+                Debug.LogError($"[ASM] Failed to load scene '{sceneName}'");
                 yield break;
             }
 
@@ -168,7 +167,7 @@ namespace MultiplayerFishing
             var scene = SceneManager.GetSceneByName(sceneName);
             if (!scene.IsValid())
             {
-                Debug.LogError($"[AdditiveSceneManager] Scene '{sceneName}' loaded but invalid");
+                Debug.LogError($"[ASM] Scene '{sceneName}' loaded but invalid");
                 yield break;
             }
 
@@ -178,191 +177,125 @@ namespace MultiplayerFishing
                 players = new HashSet<NetworkConnection>()
             };
 
-            Debug.Log($"[AdditiveSceneManager] Scene '{sceneName}' loaded successfully");
+            Debug.Log($"[ASM] Scene '{sceneName}' loaded");
 
-            // 将场景中已有的 NetworkIdentity 对象重建 observers
-            // （场景物体如 WaterZone 等需要对进入的玩家可见）
+            // Rebuild 场景内已有的 NetworkIdentity（如 WaterZone 等场景物体）
             foreach (var go in scene.GetRootGameObjects())
-            {
-                var identities = go.GetComponentsInChildren<NetworkIdentity>(true);
-                foreach (var ni in identities)
-                {
+                foreach (var ni in go.GetComponentsInChildren<NetworkIdentity>(true))
                     if (ni.isServer)
                         NetworkServer.RebuildObservers(ni, false);
-                }
-            }
 
             MovePlayerToScene(conn, sceneName);
         }
 
         /// <summary>
-        /// 将玩家的 NetworkIdentity 移动到目标场景。
-        /// 参考 Mirror 官方 MultipleAdditiveScenes 示例：
-        /// 先发 SceneMessage 让客户端加载场景，等一帧后再移动玩家并 RebuildObservers，
-        /// 确保 spawn 消息到达客户端时场景已经在加载中。
+        /// 服务器端移动玩家到目标场景。
+        /// 注意：这里不调用 RebuildObservers，等客户端发 SceneReadyMessage 后再 rebuild。
         /// </summary>
         private void MovePlayerToScene(NetworkConnectionToClient conn, string sceneName)
         {
-            if (!_loadedScenes.TryGetValue(sceneName, out var sceneInstance))
+            if (!_loadedScenes.TryGetValue(sceneName, out var si))
             {
-                Debug.LogError($"[AdditiveSceneManager] Cannot move player: scene '{sceneName}' not loaded");
+                Debug.LogError($"[ASM] Cannot move player: scene '{sceneName}' not loaded");
                 return;
             }
 
-            var playerIdentity = conn.identity;
-            if (playerIdentity == null)
+            var identity = conn.identity;
+            if (identity == null)
             {
-                Debug.LogError($"[AdditiveSceneManager] Cannot move player: no identity on connection");
+                Debug.LogError($"[ASM] Cannot move player: no identity");
                 return;
             }
 
-            StartCoroutine(CoMovePlayerToScene(conn, playerIdentity, sceneInstance, sceneName));
-        }
-
-        private IEnumerator CoMovePlayerToScene(NetworkConnectionToClient conn,
-            NetworkIdentity playerIdentity, SceneInstance sceneInstance, string sceneName)
-        {
-            // 1. 用 Mirror 内置 SceneMessage 通知客户端加载场景（触发 Mirror 的场景管理流程）
-            conn.Send(new SceneMessage { sceneName = sceneName, sceneOperation = SceneOperation.LoadAdditive });
-
-            // 2. 等一帧，确保 SceneMessage 先于后续 spawn 消息到达客户端
-            //    （与 Mirror 官方 MultipleAdditiveScenes 示例一致）
-            yield return new WaitForEndOfFrame();
-
-            if (playerIdentity == null) yield break;
-
-            // 3. 服务器端移动玩家到目标场景
-            SceneManager.MoveGameObjectToScene(playerIdentity.gameObject, sceneInstance.scene);
+            // 移动玩家到目标场景
+            SceneManager.MoveGameObjectToScene(identity.gameObject, si.scene);
 
             // 传送到出生点
-            var spawnPos = FindSpawnInScene(sceneInstance.scene);
-            var cc = playerIdentity.GetComponent<CharacterController>();
+            var spawnPos = FindSpawnInScene(si.scene);
+            var cc = identity.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
-            playerIdentity.transform.position = spawnPos;
+            identity.transform.position = spawnPos;
             if (cc != null) cc.enabled = true;
-            Debug.Log($"[AdditiveSceneManager] Teleported player to {spawnPos} in '{sceneName}'");
 
-            // 移动玩家拥有的其他对象
+            // 移动玩家拥有的其他对象（浮标、鱼等）
             foreach (var owned in conn.owned)
-            {
-                if (owned != null && owned.gameObject.scene != sceneInstance.scene)
-                    SceneManager.MoveGameObjectToScene(owned.gameObject, sceneInstance.scene);
-            }
+                if (owned != null && owned.gameObject.scene != si.scene)
+                    SceneManager.MoveGameObjectToScene(owned.gameObject, si.scene);
 
             // 更新映射
-            sceneInstance.players.Add(conn);
+            si.players.Add(conn);
             _playerSceneMap[conn] = sceneName;
 
-            // 4. RebuildObservers — SceneInterestManagement 会让同场景玩家互相可见
-            NetworkServer.RebuildObservers(playerIdentity, false);
-
-            // 同时也通知客户端加载自定义消息（LobbyUI 用来做 UI 切换和 loading screen）
+            // 通知客户端加载场景（客户端加载完后会发 SceneReadyMessage 回来）
             conn.Send(new LoadSceneMessage { sceneName = sceneName });
 
-            Debug.Log($"[AdditiveSceneManager] Player {conn} moved to '{sceneName}', " +
-                      $"players in scene: {sceneInstance.players.Count}");
+            Debug.Log($"[ASM] Player {conn} moved to '{sceneName}', count={si.players.Count}");
         }
 
-        /// <summary>
-        /// 将玩家从场景中移出。
-        /// </summary>
         private void RemovePlayerFromScene(NetworkConnection conn, string sceneName)
         {
-            if (!_loadedScenes.TryGetValue(sceneName, out var sceneInstance))
+            if (!_loadedScenes.TryGetValue(sceneName, out var si))
                 return;
 
-            sceneInstance.players.Remove(conn);
+            si.players.Remove(conn);
             _playerSceneMap.Remove(conn);
 
-            Debug.Log($"[AdditiveSceneManager] Player {conn} removed from '{sceneName}', " +
-                      $"remaining: {sceneInstance.players.Count}");
+            Debug.Log($"[ASM] Player {conn} removed from '{sceneName}', remaining={si.players.Count}");
 
-            // 如果场景没有玩家了，可以选择卸载（节省内存）
-            if (sceneInstance.players.Count == 0)
-            {
+            if (si.players.Count == 0)
                 StartCoroutine(UnloadEmptyScene(sceneName));
-            }
         }
 
-        /// <summary>
-        /// 卸载没有玩家的场景。延迟一小段时间以防玩家快速切换。
-        /// </summary>
         private IEnumerator UnloadEmptyScene(string sceneName)
         {
-            // 等待一段时间，防止玩家快速切换导致频繁加载/卸载
             yield return new WaitForSeconds(30f);
 
-            // 再次检查是否仍然为空
-            if (_loadedScenes.TryGetValue(sceneName, out var sceneInstance)
-                && sceneInstance.players.Count == 0)
+            if (_loadedScenes.TryGetValue(sceneName, out var si) && si.players.Count == 0)
             {
-                Debug.Log($"[AdditiveSceneManager] Unloading empty scene '{sceneName}'");
+                Debug.Log($"[ASM] Unloading empty scene '{sceneName}'");
 
-                // 销毁场景中的所有 NetworkIdentity 对象
-                foreach (var go in sceneInstance.scene.GetRootGameObjects())
-                {
-                    var identities = go.GetComponentsInChildren<NetworkIdentity>(true);
-                    foreach (var ni in identities)
-                    {
-                        if (ni.isServer && ni.connectionToClient == null) // 只销毁非玩家对象
+                foreach (var go in si.scene.GetRootGameObjects())
+                    foreach (var ni in go.GetComponentsInChildren<NetworkIdentity>(true))
+                        if (ni.isServer && ni.connectionToClient == null)
                             NetworkServer.Destroy(ni.gameObject);
-                    }
-                }
 
-                var asyncOp = SceneManager.UnloadSceneAsync(sceneInstance.scene);
-                if (asyncOp != null)
-                {
-                    while (!asyncOp.isDone)
+                var op = SceneManager.UnloadSceneAsync(si.scene);
+                if (op != null)
+                    while (!op.isDone)
                         yield return null;
-                }
 
                 _loadedScenes.Remove(sceneName);
-                Debug.Log($"[AdditiveSceneManager] Scene '{sceneName}' unloaded");
+                Debug.Log($"[ASM] Scene '{sceneName}' unloaded");
             }
         }
 
-        /// <summary>
-        /// 玩家断开连接时清理。由 HeadlessAutoStart 或 NetworkManager 调用。
-        /// </summary>
+        // ── 公共接口 ──
+
         public void OnPlayerDisconnected(NetworkConnection conn)
         {
             if (_playerSceneMap.TryGetValue(conn, out string sceneName))
-            {
                 RemovePlayerFromScene(conn, sceneName);
-            }
         }
 
-        /// <summary>
-        /// 获取指定场景的玩家数量。
-        /// </summary>
         public int GetPlayerCount(string sceneName)
         {
-            if (_loadedScenes.TryGetValue(sceneName, out var sceneInstance))
-                return sceneInstance.players.Count;
-            return 0;
+            return _loadedScenes.TryGetValue(sceneName, out var si) ? si.players.Count : 0;
         }
 
-        /// <summary>
-        /// 获取玩家当前所在的场景名。
-        /// </summary>
         public string GetPlayerScene(NetworkConnection conn)
         {
             _playerSceneMap.TryGetValue(conn, out string sceneName);
             return sceneName;
         }
 
-        /// <summary>
-        /// 场景实例数据。
-        /// </summary>
+        // ── 内部类型 ──
+
         private class SceneInstance
         {
             public Scene scene;
             public HashSet<NetworkConnection> players;
         }
 
-        /// <summary>
-        /// 在场景中查找 NetworkStartPosition 作为出生点。
-        /// </summary>
         private Vector3 FindSpawnInScene(Scene scene)
         {
             foreach (var rootGo in scene.GetRootGameObjects())
@@ -371,7 +304,7 @@ namespace MultiplayerFishing
                 if (nsp != null)
                     return nsp.transform.position;
             }
-            return new Vector3(98.1f, 4.215f, 66.77f); // fallback
+            return new Vector3(98.1f, 4.215f, 66.77f);
         }
     }
 }
