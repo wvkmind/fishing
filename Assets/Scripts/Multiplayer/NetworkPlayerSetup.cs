@@ -31,6 +31,7 @@ namespace MultiplayerFishing
         public override void OnStartServer()
         {
             base.OnStartServer();
+            Debug.Log($"[NPS][Server] OnStartServer: netId={netId} conn={connectionToClient}");
             // Look up player name from ConnectionPlayerMap → ServerStorage
             if (connectionToClient != null &&
                 PlayerAuthenticator.ConnectionPlayerMap.TryGetValue(connectionToClient, out string playerId))
@@ -40,7 +41,10 @@ namespace MultiplayerFishing
                 {
                     var data = storage.FindPlayer(playerId);
                     if (data != null)
+                    {
                         syncPlayerName = data.playerName;
+                        Debug.Log($"[NPS][Server] Set syncPlayerName='{syncPlayerName}' for netId={netId}");
+                    }
                 }
             }
         }
@@ -61,6 +65,8 @@ namespace MultiplayerFishing
 
         public override void OnStartClient()
         {
+            Debug.Log($"[NPS][Client] OnStartClient: netId={netId} isOwned={isOwned} " +
+                       $"syncPlayerName='{syncPlayerName}' scene='{gameObject.scene.name}'");
             if (isOwned)
                 return;
 
@@ -82,11 +88,14 @@ namespace MultiplayerFishing
         private void Start()
         {
             if (Application.isBatchMode) return;
+            Debug.Log($"[NPS] Start: netId={netId} isOwned={isOwned} syncPlayerName='{syncPlayerName}' " +
+                       $"scene='{gameObject.scene.name}'");
             CreateNameLabel(syncPlayerName);
         }
 
         private void OnPlayerNameChanged(string oldName, string newName)
         {
+            Debug.Log($"[NPS] OnPlayerNameChanged: netId={netId} '{oldName}' → '{newName}'");
             UpdateNameLabel(newName);
         }
 

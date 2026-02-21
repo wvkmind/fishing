@@ -83,21 +83,38 @@ namespace MultiplayerFishing
 
         private void OnEnterSceneRequest(NetworkConnectionToClient conn, EnterSceneMessage msg)
         {
-            if (!conn.isAuthenticated) return;
+            if (!conn.isAuthenticated)
+            {
+                Debug.LogWarning($"[ASM] OnEnterSceneRequest: conn={conn} NOT authenticated, ignoring");
+                return;
+            }
 
             string sceneName = msg.sceneName;
-            Debug.Log($"[ASM] Player {conn} requesting '{sceneName}'");
+            Debug.Log($"[ASM] OnEnterSceneRequest: conn={conn} netId={conn.identity?.netId} " +
+                       $"requesting='{sceneName}' currentGOScene='{conn.identity?.gameObject.scene.name}'");
 
             if (_playerSceneMap.TryGetValue(conn, out string current) && current == sceneName)
+            {
+                Debug.Log($"[ASM] OnEnterSceneRequest: already mapped to '{sceneName}', skipping");
                 return;
+            }
 
             if (!string.IsNullOrEmpty(current))
+            {
+                Debug.Log($"[ASM] OnEnterSceneRequest: removing from old scene '{current}'");
                 RemovePlayerFromScene(conn, current);
+            }
 
             if (_loadedScenes.ContainsKey(sceneName))
+            {
+                Debug.Log($"[ASM] OnEnterSceneRequest: scene '{sceneName}' already loaded, moving player");
                 MovePlayerToScene(conn, sceneName);
+            }
             else
+            {
+                Debug.Log($"[ASM] OnEnterSceneRequest: scene '{sceneName}' not loaded, loading now...");
                 StartCoroutine(LoadSceneAndMovePlayer(conn, sceneName));
+            }
         }
 
         private void OnLeaveSceneRequest(NetworkConnectionToClient conn, LeaveSceneMessage msg)
@@ -133,18 +150,25 @@ namespace MultiplayerFishing
         private void OnSceneReady(NetworkConnectionToClient conn, SceneReadyMessage msg)
         {
             var identity = conn.identity;
-            if (identity == null) return;
-
-            if (!_loadedScenes.TryGetValue(msg.sceneName, out var si))
+            if (identity == null)
             {
-                Debug.LogError($"[ASM] OnSceneReady: scene '{msg.sceneName}' not loaded");
+                Debug.LogError($"[ASM] OnSceneReady: conn={conn} has NO identity, aborting");
                 return;
             }
 
-            Debug.Log($"[ASM] Player {conn} scene ready: '{msg.sceneName}', moving GameObject now");
+            if (!_loadedScenes.TryGetValue(msg.sceneName, out var si))
+            {
+                Debug.LogError($"[ASM] OnSceneReady: scene '{msg.sceneName}' not in _loadedScenes");
+                return;
+            }
+
+            Debug.Log($"[ASM] OnSceneReady: conn={conn} netId={identity.netId} sceneName='{msg.sceneName}' " +
+                       $"currentScene='{identity.gameObject.scene.name}' targetScene='{si.scene.name}' " +
+                       $"targetSceneValid={si.scene.IsValid()} playersInScene={si.players.Count}");
 
             // 现在才移动 GameObject 到目标场景
             SceneManager.MoveGameObjectToScene(identity.gameObject, si.scene);
+            Debug.Log($"[ASM] OnSceneReady: MOVED netId={identity.netId} → scene='{identity.gameObject.scene.name}'");
 
             // 传送到出生点
             var spawnPos = FindSpawnInScene(si.scene);
@@ -152,18 +176,53 @@ namespace MultiplayerFishing
             if (cc != null) cc.enabled = false;
             identity.transform.position = spawnPos;
             if (cc != null) cc.enabled = true;
+            Debug.Log($"[ASM] OnSceneReady: teleported netId={identity.netId} to {spawnPos}");
 
             // 移动玩家拥有的其他对象（浮标、鱼等）
+            int movedOwned = 0;
             foreach (var owned in conn.owned)
+            {
                 if (owned != null && owned.gameObject.scene != si.scene)
+                {
                     SceneManager.MoveGameObjectToScene(owned.gameObject, si.scene);
+                    movedOwned++;
+                }
+            }
+            Debug.Log($"[ASM] OnSceneReady: moved {movedOwned} owned objects to '{msg.sceneName}'");
 
-            // SceneInterestManagement.LateUpdate 会在本帧末自动检测到 scene 变化，
-            // 标记 dirty 并 RebuildObservers，不需要手动调用。
-            // 但为了确保立即生效，也手动 rebuild 一次。
+            // 列出场景中所有 NetworkIdentity，方便排查
+            int niCount = 0;
+            foreach (var go in si.scene.GetRootGameObjects())
+                foreach (var ni in go.GetComponentsInChildren<NetworkIdentity>(true))
+                {
+                    Debug.Log($"[ASM] OnSceneReady: sceneObj netId={ni.netId} name='{ni.name}' " +
+                              $"isServer={ni.isServer} connToClient={ni.connectionToClient}");
+                    niCount++;
+                }
+            Debug.Log($"[ASM] OnSceneReady: total NetworkIdentities in '{msg.sceneName}' = {niCount}");
+
+            // RebuildObservers
             NetworkServer.RebuildObservers(identity, false);
 
-            Debug.Log($"[ASM] Player {conn} fully in '{msg.sceneName}'");
+            // 打印 rebuild 后的 observer 数量
+            Debug.Log($"[ASM] OnSceneReady: RebuildObservers done for netId={identity.netId}, " +
+                       $"observers={identity.observers?.Count ?? -1}");
+
+            // 也 rebuild 场景中其他玩家的 observers，让他们能看到新来的人
+            foreach (var go in si.scene.GetRootGameObjects())
+            {
+                foreach (var ni in go.GetComponentsInChildren<NetworkIdentity>(true))
+                {
+                    if (ni != identity && ni.isServer)
+                    {
+                        NetworkServer.RebuildObservers(ni, false);
+                        Debug.Log($"[ASM] OnSceneReady: also rebuilt observers for netId={ni.netId} " +
+                                  $"name='{ni.name}' observers={ni.observers?.Count ?? -1}");
+                    }
+                }
+            }
+
+            Debug.Log($"[ASM] OnSceneReady: COMPLETE — player netId={identity.netId} fully in '{msg.sceneName}'");
         }
 
         // ── 场景加载与玩家移动 ──
@@ -216,16 +275,20 @@ namespace MultiplayerFishing
         {
             if (!_loadedScenes.TryGetValue(sceneName, out var si))
             {
-                Debug.LogError($"[ASM] Cannot move player: scene '{sceneName}' not loaded");
+                Debug.LogError($"[ASM] MovePlayerToScene: scene '{sceneName}' not in _loadedScenes");
                 return;
             }
 
             var identity = conn.identity;
             if (identity == null)
             {
-                Debug.LogError($"[ASM] Cannot move player: no identity");
+                Debug.LogError($"[ASM] MovePlayerToScene: conn={conn} has no identity");
                 return;
             }
+
+            Debug.Log($"[ASM] MovePlayerToScene: conn={conn} netId={identity.netId} " +
+                       $"currentScene='{identity.gameObject.scene.name}' → target='{sceneName}' " +
+                       $"playersAlreadyInScene={si.players.Count}");
 
             // 先更新映射（但不移动 GameObject，避免触发 SceneInterestManagement）
             si.players.Add(conn);
@@ -234,7 +297,7 @@ namespace MultiplayerFishing
             // 通知客户端加载场景（客户端加载完后会发 SceneReadyMessage 回来）
             conn.Send(new LoadSceneMessage { sceneName = sceneName });
 
-            Debug.Log($"[ASM] Told {conn} to load '{sceneName}', waiting for SceneReady...");
+            Debug.Log($"[ASM] MovePlayerToScene: sent LoadSceneMessage to conn={conn}, waiting for SceneReady...");
         }
 
         private void RemovePlayerFromScene(NetworkConnection conn, string sceneName)

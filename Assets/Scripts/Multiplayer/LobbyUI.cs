@@ -194,9 +194,11 @@ namespace MultiplayerFishing
         {
             SetState(ClientState.Loading);
             ShowLoading("Loading map...");
+            Debug.Log($"[LobbyUI] CoLoadMap START: sceneName='{sceneName}' localPlayer={NetworkClient.localPlayer?.netId}");
 
             // 1. 加载场景（可能已被 Mirror SceneMessage 触发加载）
             var existing = SceneManager.GetSceneByName(sceneName);
+            Debug.Log($"[LobbyUI] CoLoadMap: existing scene valid={existing.IsValid()} loaded={existing.IsValid() && existing.isLoaded}");
             if (!existing.IsValid() || !existing.isLoaded)
             {
                 var op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
@@ -208,9 +210,11 @@ namespace MultiplayerFishing
                             $"Loading map... {(int)(op.progress / 0.9f * 70)}%");
                         yield return null;
                     }
+                    Debug.Log($"[LobbyUI] CoLoadMap: scene '{sceneName}' loaded via LoadSceneAsync");
                 }
                 else
                 {
+                    Debug.Log($"[LobbyUI] CoLoadMap: LoadSceneAsync returned null, waiting for Mirror...");
                     // 可能 Mirror 已经在加载了，等它完成
                     while (true)
                     {
@@ -219,7 +223,12 @@ namespace MultiplayerFishing
                         UpdateLoading(0.5f, "Waiting for scene...");
                         yield return null;
                     }
+                    Debug.Log($"[LobbyUI] CoLoadMap: scene '{sceneName}' loaded via Mirror");
                 }
+            }
+            else
+            {
+                Debug.Log($"[LobbyUI] CoLoadMap: scene '{sceneName}' was already loaded");
             }
 
             // 2. 卸载旧地图
@@ -237,6 +246,7 @@ namespace MultiplayerFishing
 
             // 3. 切换 active scene，处理 EventSystem
             var targetScene = SceneManager.GetSceneByName(sceneName);
+            Debug.Log($"[LobbyUI] CoLoadMap: targetScene valid={targetScene.IsValid()} name='{targetScene.name}'");
             if (targetScene.IsValid())
             {
                 SceneManager.SetActiveScene(targetScene);
@@ -245,8 +255,14 @@ namespace MultiplayerFishing
                 var localPlayer = NetworkClient.localPlayer;
                 if (localPlayer != null && localPlayer.gameObject.scene != targetScene)
                 {
+                    Debug.Log($"[LobbyUI] CoLoadMap: moving localPlayer netId={localPlayer.netId} " +
+                              $"from '{localPlayer.gameObject.scene.name}' → '{sceneName}'");
                     SceneManager.MoveGameObjectToScene(localPlayer.gameObject, targetScene);
-                    Debug.Log($"[LobbyUI] Moved local player to '{sceneName}'");
+                }
+                else
+                {
+                    Debug.Log($"[LobbyUI] CoLoadMap: localPlayer already in '{localPlayer?.gameObject.scene.name}' " +
+                              $"(target='{sceneName}')");
                 }
 
                 // 将玩家传送到场景的出生点
@@ -282,15 +298,26 @@ namespace MultiplayerFishing
             Debug.Log($"[LobbyUI] After SetState(InGame): canvas active={_canvas?.gameObject.activeSelf}, loading active={_loadingPanel?.activeSelf}");
 
             var enterPlayer = NetworkClient.localPlayer;
+            Debug.Log($"[LobbyUI] CoLoadMap: about to EnterGameMode, localPlayer netId={enterPlayer?.netId} " +
+                       $"scene='{enterPlayer?.gameObject.scene.name}'");
             if (enterPlayer != null)
             {
                 var nfc = enterPlayer.GetComponent<NetworkFishingController>();
-                if (nfc != null) nfc.EnterGameMode();
+                if (nfc != null)
+                {
+                    Debug.Log($"[LobbyUI] CoLoadMap: calling EnterGameMode on netId={enterPlayer.netId}");
+                    nfc.EnterGameMode();
+                }
+                else
+                {
+                    Debug.LogError($"[LobbyUI] CoLoadMap: NO NetworkFishingController on localPlayer!");
+                }
             }
 
             // 通知服务器场景加载完成，服务器收到后才 RebuildObservers 同步其他玩家
+            Debug.Log($"[LobbyUI] CoLoadMap: sending SceneReadyMessage for '{sceneName}'");
             NetworkClient.Send(new AdditiveSceneManager.SceneReadyMessage { sceneName = sceneName });
-            Debug.Log($"[LobbyUI] Sent SceneReadyMessage for '{sceneName}'");
+            Debug.Log($"[LobbyUI] CoLoadMap COMPLETE: sceneName='{sceneName}' state={State}");
         }
 
         // ── 卸载地图（回大厅）────────────────────────────────────────

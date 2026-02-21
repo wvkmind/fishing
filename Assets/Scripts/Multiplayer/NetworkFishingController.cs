@@ -174,6 +174,8 @@ namespace MultiplayerFishing
             else
             {
                 // Remote player: show/hide based on their current inGame state
+                Debug.Log($"[NFC][Client] OnStartClient REMOTE: netId={netId} syncInGame={syncInGame} " +
+                           $"scene='{gameObject.scene.name}' pos={transform.position}");
                 foreach (var r in GetComponentsInChildren<Renderer>(true))
                     r.enabled = syncInGame;
             }
@@ -185,9 +187,14 @@ namespace MultiplayerFishing
         /// </summary>
         public void EnterGameMode()
         {
-            if (_fishingSystem == null) return;
+            if (_fishingSystem == null)
+            {
+                Debug.LogError($"[NFC] EnterGameMode: _fishingSystem is NULL, netId={netId}");
+                return;
+            }
 
-            Debug.Log($"[NFC] EnterGameMode netId={netId}");
+            Debug.Log($"[NFC] EnterGameMode: netId={netId} isOwned={isOwned} isServer={isServer} " +
+                       $"scene='{gameObject.scene.name}' syncInGame={syncInGame} pos={transform.position}");
 
             // Notify server (and all clients via SyncVar) that we're in game
             CmdSetInGame(true);
@@ -913,6 +920,8 @@ namespace MultiplayerFishing
         [Command]
         private void CmdSetInGame(bool value)
         {
+            Debug.Log($"[NFC][Server] CmdSetInGame: netId={netId} old={syncInGame} new={value} " +
+                       $"scene='{gameObject.scene.name}'");
             syncInGame = value;
         }
 
@@ -922,11 +931,18 @@ namespace MultiplayerFishing
         /// </summary>
         private void OnInGameChanged(bool oldVal, bool newVal)
         {
+            Debug.Log($"[NFC] OnInGameChanged: netId={netId} isOwned={isOwned} old={oldVal} new={newVal} " +
+                       $"scene='{gameObject.scene.name}' pos={transform.position}");
             if (isOwned) return;
             if (Application.isBatchMode) return;
 
+            int rendererCount = 0;
             foreach (var r in GetComponentsInChildren<Renderer>(true))
+            {
                 r.enabled = newVal;
+                rendererCount++;
+            }
+            Debug.Log($"[NFC] OnInGameChanged: set {rendererCount} renderers enabled={newVal} for netId={netId}");
         }
     }
 }
