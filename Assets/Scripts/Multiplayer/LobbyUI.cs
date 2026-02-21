@@ -63,7 +63,8 @@ namespace MultiplayerFishing
 
         private static readonly MapEntry[] AvailableMaps = new MapEntry[]
         {
-            new MapEntry { mapName = "Inland Lake", sceneName = "GameScene" }
+            new MapEntry { mapName = "Inland Lake", sceneName = "GameScene" },
+            new MapEntry { mapName = "Island", sceneName = "IslandScene" }
         };
 
         // ══════════════════════════════════════════════════════════════
