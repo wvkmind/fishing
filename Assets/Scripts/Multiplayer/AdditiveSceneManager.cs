@@ -190,39 +190,53 @@ namespace MultiplayerFishing
             }
             Debug.Log($"[ASM] OnSceneReady: moved {movedOwned} owned objects to '{msg.sceneName}'");
 
-            // 列出场景中所有 NetworkIdentity，方便排查
-            int niCount = 0;
-            foreach (var go in si.scene.GetRootGameObjects())
-                foreach (var ni in go.GetComponentsInChildren<NetworkIdentity>(true))
-                {
-                    Debug.Log($"[ASM] OnSceneReady: sceneObj netId={ni.netId} name='{ni.name}' " +
-                              $"isServer={ni.isServer} connToClient={ni.connectionToClient}");
-                    niCount++;
-                }
-            Debug.Log($"[ASM] OnSceneReady: total NetworkIdentities in '{msg.sceneName}' = {niCount}");
+            // 不在这里手动 RebuildObservers！
+            // SceneInterestManagement.LateUpdate 会在本帧末检测到 scene 变化，
+            // 更新内部 sceneObjects 字典，然后自动 RebuildObservers。
+            // 如果我们在这里手动 rebuild，sceneObjects 还没更新，结果会不对
+            // （新玩家不在 GameScene 的 hashset 里，导致老玩家看不到新玩家）。
+            //
+            // 但为了保险，延迟一帧后再额外 rebuild 一次，确保所有 observer 关系正确。
+            StartCoroutine(DelayedRebuildObservers(si.scene, identity));
 
-            // RebuildObservers
-            NetworkServer.RebuildObservers(identity, false);
+            Debug.Log($"[ASM] OnSceneReady: player netId={identity.netId} moved to '{msg.sceneName}', " +
+                       $"waiting for LateUpdate + delayed rebuild");
+        }
 
-            // 打印 rebuild 后的 observer 数量
-            Debug.Log($"[ASM] OnSceneReady: RebuildObservers done for netId={identity.netId}, " +
-                       $"observers={identity.observers?.Count ?? -1}");
+        /// <summary>
+        /// 延迟一帧后 rebuild 场景内所有 NetworkIdentity 的 observers。
+        /// 这样 SceneInterestManagement.LateUpdate 已经更新了 sceneObjects 字典，
+        /// rebuild 结果才是正确的。
+        /// </summary>
+        private IEnumerator DelayedRebuildObservers(Scene scene, NetworkIdentity newPlayer)
+        {
+            // 等一帧，让 SceneInterestManagement.LateUpdate 先执行
+            yield return null;
 
-            // 也 rebuild 场景中其他玩家的 observers，让他们能看到新来的人
-            foreach (var go in si.scene.GetRootGameObjects())
+            if (!scene.IsValid())
+            {
+                Debug.LogWarning($"[ASM] DelayedRebuild: scene no longer valid");
+                yield break;
+            }
+
+            Debug.Log($"[ASM] DelayedRebuild: rebuilding all observers in '{scene.name}'");
+
+            int rebuilt = 0;
+            foreach (var go in scene.GetRootGameObjects())
             {
                 foreach (var ni in go.GetComponentsInChildren<NetworkIdentity>(true))
                 {
-                    if (ni != identity && ni.isServer)
+                    if (ni != null && ni.isServer)
                     {
                         NetworkServer.RebuildObservers(ni, false);
-                        Debug.Log($"[ASM] OnSceneReady: also rebuilt observers for netId={ni.netId} " +
-                                  $"name='{ni.name}' observers={ni.observers?.Count ?? -1}");
+                        Debug.Log($"[ASM] DelayedRebuild: netId={ni.netId} name='{ni.name}' " +
+                                  $"observers={ni.observers?.Count ?? -1}");
+                        rebuilt++;
                     }
                 }
             }
 
-            Debug.Log($"[ASM] OnSceneReady: COMPLETE — player netId={identity.netId} fully in '{msg.sceneName}'");
+            Debug.Log($"[ASM] DelayedRebuild: DONE, rebuilt {rebuilt} objects in '{scene.name}'");
         }
 
         // ── 场景加载与玩家移动 ──
