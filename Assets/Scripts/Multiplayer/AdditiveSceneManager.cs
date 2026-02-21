@@ -125,27 +125,45 @@ namespace MultiplayerFishing
         }
 
         /// <summary>
-        /// 客户端场景加载完成后的确认。此时才 RebuildObservers，
-        /// 保证 spawn 消息到达时客户端场景已就绪。
+        /// 客户端场景加载完成后的确认。
+        /// 此时才真正移动服务器端的 GameObject 到目标场景，
+        /// SceneInterestManagement.LateUpdate 检测到 scene 变化后会自动 RebuildObservers，
+        /// 此时客户端场景已就绪，spawn 消息到达后能正确显示。
         /// </summary>
         private void OnSceneReady(NetworkConnectionToClient conn, SceneReadyMessage msg)
         {
-            if (conn.identity == null) return;
+            var identity = conn.identity;
+            if (identity == null) return;
 
-            Debug.Log($"[ASM] Player {conn} scene ready: '{msg.sceneName}'");
-
-            // RebuildObservers 让 SceneInterestManagement 把同场景的玩家互相加入 observer
-            NetworkServer.RebuildObservers(conn.identity, false);
-
-            // 也 rebuild 同场景其他玩家，让他们能看到新来的人
-            if (_loadedScenes.TryGetValue(msg.sceneName, out var si))
+            if (!_loadedScenes.TryGetValue(msg.sceneName, out var si))
             {
-                foreach (var other in si.players)
-                {
-                    if (other != conn && other.identity != null)
-                        NetworkServer.RebuildObservers(other.identity, false);
-                }
+                Debug.LogError($"[ASM] OnSceneReady: scene '{msg.sceneName}' not loaded");
+                return;
             }
+
+            Debug.Log($"[ASM] Player {conn} scene ready: '{msg.sceneName}', moving GameObject now");
+
+            // 现在才移动 GameObject 到目标场景
+            SceneManager.MoveGameObjectToScene(identity.gameObject, si.scene);
+
+            // 传送到出生点
+            var spawnPos = FindSpawnInScene(si.scene);
+            var cc = identity.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            identity.transform.position = spawnPos;
+            if (cc != null) cc.enabled = true;
+
+            // 移动玩家拥有的其他对象（浮标、鱼等）
+            foreach (var owned in conn.owned)
+                if (owned != null && owned.gameObject.scene != si.scene)
+                    SceneManager.MoveGameObjectToScene(owned.gameObject, si.scene);
+
+            // SceneInterestManagement.LateUpdate 会在本帧末自动检测到 scene 变化，
+            // 标记 dirty 并 RebuildObservers，不需要手动调用。
+            // 但为了确保立即生效，也手动 rebuild 一次。
+            NetworkServer.RebuildObservers(identity, false);
+
+            Debug.Log($"[ASM] Player {conn} fully in '{msg.sceneName}'");
         }
 
         // ── 场景加载与玩家移动 ──
@@ -189,8 +207,10 @@ namespace MultiplayerFishing
         }
 
         /// <summary>
-        /// 服务器端移动玩家到目标场景。
-        /// 注意：这里不调用 RebuildObservers，等客户端发 SceneReadyMessage 后再 rebuild。
+        /// 准备将玩家移入目标场景。
+        /// 此时只更新映射、通知客户端加载场景，不移动 GameObject。
+        /// 等客户端发 SceneReadyMessage 确认后才真正移动，
+        /// 避免 SceneInterestManagement.LateUpdate 在客户端场景未就绪时触发 spawn。
         /// </summary>
         private void MovePlayerToScene(NetworkConnectionToClient conn, string sceneName)
         {
@@ -207,29 +227,14 @@ namespace MultiplayerFishing
                 return;
             }
 
-            // 移动玩家到目标场景
-            SceneManager.MoveGameObjectToScene(identity.gameObject, si.scene);
-
-            // 传送到出生点
-            var spawnPos = FindSpawnInScene(si.scene);
-            var cc = identity.GetComponent<CharacterController>();
-            if (cc != null) cc.enabled = false;
-            identity.transform.position = spawnPos;
-            if (cc != null) cc.enabled = true;
-
-            // 移动玩家拥有的其他对象（浮标、鱼等）
-            foreach (var owned in conn.owned)
-                if (owned != null && owned.gameObject.scene != si.scene)
-                    SceneManager.MoveGameObjectToScene(owned.gameObject, si.scene);
-
-            // 更新映射
+            // 先更新映射（但不移动 GameObject，避免触发 SceneInterestManagement）
             si.players.Add(conn);
             _playerSceneMap[conn] = sceneName;
 
             // 通知客户端加载场景（客户端加载完后会发 SceneReadyMessage 回来）
             conn.Send(new LoadSceneMessage { sceneName = sceneName });
 
-            Debug.Log($"[ASM] Player {conn} moved to '{sceneName}', count={si.players.Count}");
+            Debug.Log($"[ASM] Told {conn} to load '{sceneName}', waiting for SceneReady...");
         }
 
         private void RemovePlayerFromScene(NetworkConnection conn, string sceneName)
